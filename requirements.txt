@@ -4,30 +4,14 @@ PySide6>=6.7.0
 # Data validation
 pydantic>=2.7.0
 
-# Async support (for Phase 3+ LLM calls)
-# httpx>=0.27.0
-# qasync>=0.27.0
+# LLM API client
+httpx>=0.27.0
 
-# Input (Phase 2+)
-# pynput>=1.7.6
+# Clipboard (hotkey text capture)
+pyperclip>=1.8.2
 
-# Clipboard (Phase 2+)
-# pyperclip>=1.8.2
-# pywin32>=306
+# Desktop automation (Ctrl+C simulation)
+pyautogui>=0.9.54
 
-# Desktop automation (Phase 4+)
-# pyautogui>=0.9.54
-
-# LLM API (Phase 3+)
-# openai>=1.30.0
-
-# Scheduling (Phase 4+)
-# schedule>=1.2.0
-
-# System tray
-# pystray>=0.19.0  # Using PySide6's built-in QSystemTrayIcon instead
-
-# Database - using Python built-in sqlite3
-
-# Packaging (dev dependency)
+# Packaging (optional, for building .exe)
 # pyinstaller>=6.0.0
