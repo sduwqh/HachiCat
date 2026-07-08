@@ -1,0 +1,16 @@
+{
+  "cell_width": 1024,
+  "cell_height": 1024,
+  "columns": 1,
+  "rows": 1,
+  "default_state": "idle",
+  "states": [
+    {
+      "name": "idle",
+      "row": 0,
+      "frame_count": 1,
+      "frame_durations": [200],
+      "loop": true
+    }
+  ]
+}

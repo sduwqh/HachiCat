@@ -1,0 +1,1 @@
+# Input layer — hotkeys, clipboard

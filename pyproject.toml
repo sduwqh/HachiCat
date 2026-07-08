@@ -1,0 +1,14 @@
+[project]
+name = "accompet"
+version = "0.1.0"
+description = "A cute desktop pet agent that helps with small computer tasks"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "sduwqh" }]
+
+[project.scripts]
+accompet = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
