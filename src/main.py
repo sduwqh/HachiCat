@@ -424,7 +424,11 @@ def main() -> int:
         import shiboken6
         dlg = settings_dialog_ref[0]
         if dlg and shiboken6.isValid(dlg) and dlg.isVisible():
+            # Block signals so syncing the box doesn't re-trigger the toggle
+            # handler (which would recurse into set_breath_mode).
+            dlg._breath_mode_check.blockSignals(True)
             dlg._breath_mode_check.setChecked(enabled)
+            dlg._breath_mode_check.blockSignals(False)
     pet_window.breath_mode_changed.connect(_sync_breath_checkbox)
 
     # ---- Tray ----
@@ -750,16 +754,17 @@ def main() -> int:
         if act != "__dismissed__" else None
     )
 
-    # Translation result → show as bubble
-    pipeline.translation_ready.connect(
-        lambda text: pet_window.show_bubble(
+    # Translation result → show as bubble + play success reaction
+    def _on_translation(text: str):
+        pet_window.notify_task_done(True, "")  # jumping → idle, stops review
+        pet_window.show_bubble(
             f"<div style='margin:0;padding:0;line-height:1.4;'>"
             f"🌐 {md_to_html(text)}"
             f"<br><span style='color:#94a3b8;font-size:10px;'>(点击任意位置关闭)</span>"
             f"</div>",
             BubbleType.TRANSLATION,
         )
-    )
+    pipeline.translation_ready.connect(_on_translation)
 
     hotkey_manager.hotkey_triggered.connect(on_hotkey, Qt.QueuedConnection)
     hotkey_manager.start()

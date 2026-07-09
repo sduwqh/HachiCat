@@ -23,6 +23,7 @@ from src.pet.physics import PetPhysics, PhysicsConfig
 from src.pet.bubble import BubbleWidget, BubbleType
 from src.input.global_monitor import GlobalInputMonitor
 from src.utils.theme import Theme
+from src.utils.icons import icon, icon_pixmap
 
 
 class PetWindow(QWidget):
@@ -162,7 +163,7 @@ class PetWindow(QWidget):
 
     @property
     def _is_hachicat(self) -> bool:
-        return self._sprite_path and self._sprite_path.name == "catpet.png"
+        return bool(self._sprite_path) and self._sprite_path.name == "catpet.png"
 
     # ==================================================================
     # Mouse Events
@@ -197,11 +198,12 @@ class PetWindow(QWidget):
                     self._pet_widget.swap_image(self._alt_image_path)
             else:
                 self._dragging_petdex = True
-                self._animator.play("run")
+                self._animator.play("run_right")
             self._state_machine.on_drag_start()
             self._state_machine.on_user_interaction()
             self._drag_on_pet = True
             self._drag_start_x = event.globalPosition().toPoint().x()
+            self._drag_last_x = self._drag_start_x
             global_pos = event.globalPosition().toPoint()
             self._drag_offset = global_pos - self.frameGeometry().topLeft()
             self._physics.drag_start(global_pos.x() - self._drag_offset.x(),
@@ -220,11 +222,14 @@ class PetWindow(QWidget):
             new_pos = global_pos - self._drag_offset
             self.move(new_pos)
             self._physics.drag_move(new_pos.x(), new_pos.y())
-            if not self._is_hachicat and hasattr(self, '_drag_start_x'):
-                dx = global_pos.x() - self._drag_start_x
-                if abs(dx) > 15:
-                    self._pet_widget._flip = dx < 0
-                    self._pet_widget.update()
+            # Petdex: use dedicated left/right run rows (no mirroring needed)
+            if not self._is_hachicat and hasattr(self, '_drag_last_x'):
+                dx = global_pos.x() - self._drag_last_x
+                if abs(dx) > 4:
+                    want = "run_left" if dx < 0 else "run_right"
+                    if self._animator.current_state_name != want:
+                        self._animator.play(want)
+                    self._drag_last_x = global_pos.x()
             self._pomo_follow()
             event.accept()
         else:
@@ -343,16 +348,18 @@ class PetWindow(QWidget):
             QMenu::item {
                 padding: 7px 26px; border-radius: 8px; color: #333;
             }
-            QMenu::item:selected { background: rgba(79,124,255,0.12); color: #1f2937; }
+            QMenu::item:selected { background: rgba(255,122,89,0.14); color: #1f2937; }
         """)
-        view_todo_action = menu.addAction("📝  查看待办")
+        _c = Theme.muted
+        view_todo_action = menu.addAction(icon("todo", _c, 16), "  查看待办")
         view_todo_action.triggered.connect(lambda: self.agent_triggered.emit("view_todos"))
-        view_note_action = menu.addAction("📖  查看笔记")
+        view_note_action = menu.addAction(icon("note", _c, 16), "  查看笔记")
         view_note_action.triggered.connect(lambda: self.agent_triggered.emit("view_notes"))
-        gallery_action = menu.addAction("🖼  查看图库")
+        gallery_action = menu.addAction(icon("gallery", _c, 16), "  查看图库")
         gallery_action.triggered.connect(lambda: self.agent_triggered.emit("view_gallery"))
         # Pomodoro submenu
-        pomo_menu = QMenu("🍅  番茄钟", menu)
+        pomo_menu = QMenu("  番茄钟", menu)
+        pomo_menu.setIcon(icon("pomodoro", _c, 16))
         pomo_menu.setStyleSheet(menu.styleSheet())
         for mins, label in [(5, "5 分钟"), (15, "15 分钟"), (25, "25 分钟"), (45, "45 分钟")]:
             a = pomo_menu.addAction(label)
@@ -363,25 +370,27 @@ class PetWindow(QWidget):
         music_layout = QHBoxLayout(music_widget)
         music_layout.setContentsMargins(6, 2, 6, 2)
         music_layout.setSpacing(3)
-        for label_text, action_name in [("⏮", "music_prev"), ("⏯", "music_play_pause"), ("⏭", "music_next")]:
-            btn = QLabel(label_text)
+        for icon_name, action_name in [("music-prev", "music_prev"), ("music-play", "music_play_pause"), ("music-next", "music_next")]:
+            btn = QLabel()
             btn.setFixedSize(30, 24)
             btn.setAlignment(Qt.AlignCenter)
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet("""
-                QLabel { color: #333; background: rgba(255,255,255,0.72);
-                         border: 1px solid rgba(31,41,55,0.10); border-radius: 6px;
-                         font-size: 12px; }
-                QLabel:hover { background: rgba(79,124,255,0.12); color: #4f7cff;
-                               border-color: rgba(79,124,255,0.30); }
-            """)
+            btn._icon_name = icon_name
+            btn.setPixmap(icon_pixmap(icon_name, "#555", 14))
+            btn._normal = ("QLabel { background: rgba(255,255,255,0.72);"
+                           " border: 1px solid rgba(31,41,55,0.10); border-radius: 6px; }")
+            btn._hover = ("QLabel { background: rgba(255,122,89,0.14);"
+                          " border: 1px solid rgba(255,122,89,0.34); border-radius: 6px; }")
+            btn.setStyleSheet(btn._normal)
+            btn.enterEvent = lambda e, b=btn: (b.setStyleSheet(b._hover), b.setPixmap(icon_pixmap(b._icon_name, Theme.accent, 14)))
+            btn.leaveEvent = lambda e, b=btn: (b.setStyleSheet(b._normal), b.setPixmap(icon_pixmap(b._icon_name, "#555", 14)))
             btn.mousePressEvent = lambda e, a=action_name: self.agent_triggered.emit(a)
             music_layout.addWidget(btn)
         music_action = QWidgetAction(menu)
         music_action.setDefaultWidget(music_widget)
         menu.addAction(music_action)
         menu.addSeparator()
-        toggle_action = menu.addAction("🙈  隐藏宠物")
+        toggle_action = menu.addAction(icon("hide", Theme.muted, 16), "  隐藏宠物")
         toggle_action.triggered.connect(self.hide)
         menu.exec(QCursor.pos())
         for d in (100, 250, 450):
@@ -402,10 +411,9 @@ class PetWindow(QWidget):
                 return
             _petdex_map = {
                 PetState.IDLE: "idle",
-                PetState.DRAGGING: "run",
-                PetState.WALKING: "run",
+                PetState.WALKING: "running",
                 PetState.WORKING: "review",
-                PetState.HAPPY: "jump",
+                PetState.HAPPY: "jumping",
                 PetState.SAD: "failed",
             }
             self._animator.play(_petdex_map.get(new, "idle"))
@@ -457,7 +465,7 @@ class PetWindow(QWidget):
         if self._is_hachicat:
             self._animator.play("working")
         else:
-            self._animator.play("review")
+            self._animator.play("review")  # focused thinking loop
         self._think_timer.start(1200)
 
     def _spawn_think_bubble(self) -> None:
@@ -521,6 +529,22 @@ class PetWindow(QWidget):
         from src.utils.pets import get_sprite_path
         import json
         from pathlib import Path
+
+        # Only reset breath/greeting when actually changing to a DIFFERENT
+        # skin. Re-applying the same skin (e.g. from apply_settings_live after
+        # toggling breath mode) must not clobber the current breath state.
+        skin_actually_changed = (
+            getattr(self, '_current_skin_name', None) != skin
+        )
+        if skin_actually_changed:
+            if self._breath_mode:
+                self.set_breath_mode(False)
+            if hasattr(self, '_greet_flash') and self._greet_flash.isActive():
+                self._greet_flash.stop()
+            if hasattr(self, '_greet_bubble') and self._greet_bubble.isActive():
+                self._greet_bubble.stop()
+            self._flash_busy = False
+            self._dragging_petdex = False
 
         if hasattr(self, '_skin_sizes') and hasattr(self, '_current_skin_name'):
             self._skin_sizes[self._current_skin_name] = self._pet_widget._scale
@@ -588,10 +612,23 @@ class PetWindow(QWidget):
         else:
             saved = self._skin_sizes.get(skin, 0) if hasattr(self, '_skin_sizes') else 0
             new_scale = saved if saved > 0 else 180 / cfg["cell_width"]
+        # Anchor the resize around the current center so the pet doesn't
+        # jump, then clamp fully on-screen (a bigger new skin at an old
+        # bottom/edge position would otherwise overflow off-screen).
+        old_cx = self.x() + self.width() // 2
+        old_cy = self.y() + self.height() // 2
         self._pet_widget.set_scale(new_scale)
         new_w = self._pet_widget.width()
         new_h = self._pet_widget.height()
-        self.resize(new_w, new_h)
+        nx = old_cx - new_w // 2
+        ny = old_cy - new_h // 2
+        screen = QApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            nx = max(geo.left(), min(nx, geo.right() - new_w))
+            ny = max(geo.top(), min(ny, geo.bottom() - new_h))
+        self.setGeometry(nx, ny, new_w, new_h)
+        self._physics.set_position(nx, ny)
         self.show()
         self._pet_widget.repaint()
 
@@ -698,7 +735,8 @@ class PetWindow(QWidget):
 
     def _auto_breath_toggle(self) -> None:
         import random
-        if self._breath_mode:
+        # Only auto-trigger for HaChiCat, and never stack on an active session
+        if self._breath_mode or not self._is_hachicat:
             return
         if random.random() < 0.3:
             duration = random.randint(2, 8)
@@ -710,13 +748,19 @@ class PetWindow(QWidget):
             return
         import random
         self._idle_play_timer.setInterval(random.randint(8000, 20000))
-        r = random.random()
-        if r < 0.25:
-            self._animator.play("jump")
-            QTimer.singleShot(700, lambda: self._animator.play("idle"))
-        elif r < 0.50:
-            self._animator.play("wave")
-            QTimer.singleShot(800, lambda: self._animator.play("idle"))
+        # Pick a random one-shot animation from whatever the sprite provides,
+        # then return to idle. Weighted toward common cute actions.
+        available = set(self._animator._states.keys())
+        candidates = [
+            ("jumping", 800), ("waving", 700),
+            ("waiting", 1200), ("running", 900),
+        ]
+        choices = [(name, dur) for name, dur in candidates if name in available]
+        if not choices:
+            return
+        name, dur = random.choice(choices)
+        self._animator.play(name)
+        QTimer.singleShot(dur, lambda: self._animator.play("idle"))
 
     def _auto_breath_off(self) -> None:
         self.set_breath_mode(False)
@@ -763,8 +807,6 @@ class PetWindow(QWidget):
             self._pomo_bubble.dismiss_now()
         if hasattr(self, '_celebration_timer') and self._celebration_timer.isActive():
             self._celebration_timer.stop()
-        self._pomo_breath_was_on = self._breath_mode
-        self.set_breath_mode(True)
         import random
         self._pomo_remaining = minutes * 60
         self._pomo_total = minutes * 60
@@ -809,8 +851,6 @@ class PetWindow(QWidget):
         if self._pomo_remaining <= 0:
             self._pomo_timer.stop()
             self._pomo_bubble.dismiss_now()
-            if hasattr(self, '_pomo_breath_was_on') and not self._pomo_breath_was_on:
-                self.set_breath_mode(False)
             self._pomo_celebrate()
         else:
             self._update_pomo_bubble()
@@ -863,7 +903,7 @@ class PetWindow(QWidget):
         QTimer.singleShot(1000, lambda: setattr(self, '_throw_allowed', True))
         QTimer.singleShot(800, self._startup_greet)
         if not self._is_hachicat:
-            QTimer.singleShot(600, lambda: self._animator.play("wave"))
+            QTimer.singleShot(600, lambda: self._animator.play("waving"))
             QTimer.singleShot(2000, lambda: self._animator.play("idle"))
 
     def hideEvent(self, event) -> None:

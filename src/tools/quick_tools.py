@@ -246,32 +246,29 @@ def create_app_launcher_tool() -> Tool:
                 pet_reaction="sad",
             )
 
-        try:
-            # Look up known app
-            command = APP_MAP.get(app_name, app_name)
+        # Only allow known apps — prevents command injection from LLM output.
+        command = APP_MAP.get(app_name)
+        if command is None:
+            return ToolResult(
+                success=False,
+                message=f"未知应用: {app_name}\n仅支持常见应用（记事本、计算器等）",
+                pet_reaction="sad",
+            )
 
-            # Try to launch
-            subprocess.Popen(command, shell=True)
+        try:
+            # shell=False + list form: no shell interpretation of the command
+            subprocess.Popen([command])
             return ToolResult(
                 success=True,
                 message=f"正在启动 🚀\n{app_name}",
                 pet_reaction="happy",
             )
         except Exception as e:
-            # Try opening via Windows Run dialog as fallback
-            try:
-                subprocess.Popen(["start", app_name], shell=True)
-                return ToolResult(
-                    success=True,
-                    message=f"正在启动 🚀\n{app_name}",
-                    pet_reaction="happy",
-                )
-            except Exception:
-                logger.exception("App launcher error")
-                return ToolResult(
-                    success=False,
-                    message=f"启动失败: {app_name}",
-                    error=str(e), pet_reaction="sad",
-                )
+            logger.exception("App launcher error")
+            return ToolResult(
+                success=False,
+                message=f"启动失败: {app_name}",
+                error=str(e), pet_reaction="sad",
+            )
 
     return Tool(meta=meta, handler=handler)

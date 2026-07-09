@@ -59,8 +59,13 @@ class PetWidget(QWidget):
         self.update()
 
     def set_scale(self, scale: float) -> None:
-        """Set display scale factor."""
-        self._scale = max(0.3, min(3.0, scale))
+        """Set display scale factor.
+
+        Lower bound accommodates large sprite sheets (e.g. 1024px HaChiCat
+        scaled to ~180px display = 0.18), matching the direct-scale path
+        used by switch_skin.
+        """
+        self._scale = max(0.05, min(3.0, scale))
         self.setFixedSize(
             int(self._cell_width * self._scale),
             int(self._cell_height * self._scale),

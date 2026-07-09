@@ -17,6 +17,7 @@ from PySide6.QtGui import QIcon, QAction, QPainter, QPixmap, QColor
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 
 from src.utils.theme import Theme
+from src.utils.icons import icon as make_icon
 
 
 def _generate_tray_icon(size: int = 32) -> QIcon:
@@ -83,21 +84,22 @@ class SystemTray(QSystemTrayIcon):
                 border-radius: 8px;
             }
             QMenu::item:selected {
-                background: rgba(79,124,255,0.12);
+                background: rgba(255,122,89,0.14);
                 color: #1f2937;
             }
         """)
 
-        self._toggle_action = QAction("🐱 显示/隐藏宠物")
+        _c = Theme.muted
+        self._toggle_action = QAction(make_icon("eye", _c, 16), " 显示/隐藏宠物")
         self._toggle_action.triggered.connect(self._on_toggle)
 
-        self._todo_action = QAction("📋 查看待办")
-        self._notes_action = QAction("📖 查看笔记")
+        self._todo_action = QAction(make_icon("todo", _c, 16), " 查看待办")
+        self._notes_action = QAction(make_icon("note", _c, 16), " 查看笔记")
 
-        self._settings_action = QAction("⚙️ 设置")
+        self._settings_action = QAction(make_icon("settings", _c, 16), " 设置")
         self._settings_action.triggered.connect(self._on_settings)
 
-        self._quit_action = QAction("❌ 退出")
+        self._quit_action = QAction(make_icon("close", _c, 16), " 退出")
         self._quit_action.triggered.connect(self._on_quit)
 
         self._menu.addAction(self._toggle_action)

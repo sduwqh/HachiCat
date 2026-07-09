@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.utils.theme import Theme, panel_style
+from src.utils.icons import icon, icon_pixmap
 
 
 class PopupMenu(QWidget):
@@ -51,29 +52,39 @@ class PopupMenu(QWidget):
         title_row.addWidget(title)
         title_row.addStretch()
 
-        close_btn = QLabel("✕")
+        close_btn = QLabel()
         close_btn.setFixedSize(22, 22)
         close_btn.setAlignment(Qt.AlignCenter)
         close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet(
-            f"QLabel {{ color: {Theme.muted}; background: transparent; "
-            "font-size: 14px; font-weight: bold; border-radius: 11px; }} "
-            f"QLabel:hover {{ color: {Theme.text}; background: {Theme.accent_soft}; }}"
+        close_btn.setPixmap(icon_pixmap("close", Theme.muted, 14))
+        close_btn._normal = "QLabel { background: transparent; border-radius: 11px; }"
+        close_btn._hover = f"QLabel {{ background: {Theme.accent_soft}; border-radius: 11px; }}"
+        close_btn.setStyleSheet(close_btn._normal)
+        close_btn.enterEvent = lambda e: (
+            close_btn.setStyleSheet(close_btn._hover),
+            close_btn.setPixmap(icon_pixmap("close", Theme.text, 14)),
+        )
+        close_btn.leaveEvent = lambda e: (
+            close_btn.setStyleSheet(close_btn._normal),
+            close_btn.setPixmap(icon_pixmap("close", Theme.muted, 14)),
         )
         close_btn.mousePressEvent = lambda e: self.hide()
         title_row.addWidget(close_btn)
         layout.addLayout(title_row)
 
-        self._add_btn(layout, "🔍  搜索", "search", "#4A90D9")
-        self._add_btn(layout, "📝  记录笔记", "note", "#5B9E5B")
-        self._add_btn(layout, "📋  添加待办", "todo", "#E8943A")
-        self._add_btn(layout, "🌐  翻译", "translate", "#8E6FBF")
+        self._add_btn(layout, "搜索", "search", "search", "#4A90D9")
+        self._add_btn(layout, "记录笔记", "note", "note", "#5B9E5B")
+        self._add_btn(layout, "添加待办", "todo", "todo", "#E8943A")
+        self._add_btn(layout, "翻译", "translate", "translate", "#8E6FBF")
 
         layout.addStretch()
 
-    def _add_btn(self, layout, text: str, action: str, color: str) -> None:
-        btn = QPushButton(text)
+    def _add_btn(self, layout, text: str, icon_name: str, action: str, color: str) -> None:
+        btn = QPushButton("  " + text)
         btn.setCursor(Qt.PointingHandCursor)
+        btn.setIcon(icon(icon_name, Theme.muted, 17))
+        btn._icon_name = icon_name
+        btn._icon_color = color
         btn.setStyleSheet(f"""
             QPushButton {{
                 color: {Theme.text}; font-size: 14px; font-weight: 500;
@@ -89,6 +100,9 @@ class PopupMenu(QWidget):
             }}
         """)
         btn.clicked.connect(lambda: self._on_action(action))
+        # Tint the icon to the action color on hover
+        btn.enterEvent = lambda e, b=btn: b.setIcon(icon(b._icon_name, b._icon_color, 17))
+        btn.leaveEvent = lambda e, b=btn: b.setIcon(icon(b._icon_name, Theme.muted, 17))
         layout.addWidget(btn)
 
     def _on_action(self, action: str) -> None:

@@ -46,6 +46,9 @@ class GlobalInputMonitor(QObject):
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
         self._poll_timer: QTimer | None = None
+        # Keyboard scanning is expensive (~130 VK reads); do it every
+        # 3rd tick (~90ms) while mouse clicks stay responsive at 30ms.
+        self._kbd_skip = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -88,7 +91,10 @@ class GlobalInputMonitor(QObject):
             return
         GlobalInputMonitor._prev_rbtn = 1 if rbtn else 0
 
-        # --- Keyboard: LSB edge detection ---
+        # --- Keyboard: LSB edge detection (throttled to every 3rd tick) ---
+        self._kbd_skip = (self._kbd_skip + 1) % 3
+        if self._kbd_skip != 0:
+            return
         for lo, hi in _VK_RANGES:
             for vk in range(lo, hi + 1):
                 if ctypes.windll.user32.GetAsyncKeyState(vk) & 0x0001:

@@ -18,9 +18,10 @@ class Theme:
     muted = "#475569"
     border = "rgba(31, 41, 55, 0.14)"
     border_strong = "rgba(31, 41, 55, 0.20)"
-    accent = "#4f7cff"
-    accent_hover = "#3f66d1"
-    accent_soft = "rgba(79, 124, 255, 0.14)"
+    accent = "#ff7a59"
+    accent_hover = "#f2603c"
+    accent_soft = "rgba(255, 122, 89, 0.14)"
+    accent_pink = "#ff9eb5"
     success = "#5d8b64"
     warning = "#c28b28"
     danger = "#c26666"
@@ -54,12 +55,12 @@ def app_window_style() -> str:
             margin: 2px 0 2px 0;
         }}
         QScrollBar::handle:vertical {{
-            background: rgba(79, 124, 255, 0.24);
+            background: rgba(255, 122, 89, 0.28);
             border-radius: 5px;
             min-height: 24px;
         }}
         QScrollBar::handle:vertical:hover {{
-            background: rgba(79, 124, 255, 0.38);
+            background: rgba(255, 122, 89, 0.44);
         }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
             height: 0;
@@ -73,7 +74,7 @@ def group_box_style() -> str:
             color: {Theme.text};
             font-weight: 600;
             border: 1px solid {Theme.border};
-            border-radius: 14px;
+            border-radius: 16px;
             margin-top: 14px;
             padding-top: 18px;
             background: {Theme.surface_soft};
@@ -173,6 +174,6 @@ def panel_style(object_name: str = "") -> str:
         {prefix} {{
             background: {Theme.surface};
             border: 1px solid {Theme.border};
-            border-radius: 14px;
+            border-radius: 16px;
         }}
     """

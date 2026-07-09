@@ -13,6 +13,16 @@ from PySide6.QtGui import QFont, QPixmap, QPalette, QBrush
 from src.memory.database import Database
 from src.utils.theme import Theme, chip_button_style
 from src.utils.markdown import md_to_html
+from src.utils.icons import icon, icon_pixmap
+
+
+def _rotated(pm, deg):
+    """Rotate a pixmap while preserving its device pixel ratio."""
+    from PySide6.QtGui import QTransform
+    dpr = pm.devicePixelRatio()
+    out = pm.transformed(QTransform().rotate(deg), Qt.SmoothTransformation)
+    out.setDevicePixelRatio(dpr)
+    return out
 
 
 class NoteViewer(QDialog):
@@ -25,7 +35,7 @@ class NoteViewer(QDialog):
         self._bg_pixmap = None
         self._on_bg_changed = on_bg_changed
 
-        self.setWindowTitle("📝 笔记")
+        self.setWindowTitle("笔记")
         self.setMinimumSize(480, 400)
         self.setWindowFlags(
             Qt.Tool
@@ -40,8 +50,8 @@ class NoteViewer(QDialog):
             }}
             QScrollArea {{ background: transparent; border: none; }}
             QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px 0 2px 0; }}
-            QScrollBar::handle:vertical {{ background: rgba(79,124,255,0.24); border-radius: 5px; min-height: 24px; }}
-            QScrollBar::handle:vertical:hover {{ background: rgba(79,124,255,0.38); }}
+            QScrollBar::handle:vertical {{ background: rgba(255,122,89,0.28); border-radius: 5px; min-height: 24px; }}
+            QScrollBar::handle:vertical:hover {{ background: rgba(255,122,89,0.44); }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
         """)
         if self._bg_path:
@@ -83,11 +93,20 @@ class NoteViewer(QDialog):
         layout.setContentsMargins(16, 16, 16, 14)
         layout.setSpacing(10)
 
-        title = QLabel("📝 笔记")
+        title_bar = QHBoxLayout()
+        title_bar.setContentsMargins(0, 0, 0, 0)
+        title_bar.setSpacing(4)
+        title_icon = QLabel()
+        title_icon.setPixmap(icon_pixmap("note", Theme.accent, 20))
+        title_icon.setStyleSheet("background: transparent;")
+        title_bar.addWidget(title_icon)
+        title = QLabel("笔记")
         f = QFont(); f.setPointSize(14); f.setBold(True)
         title.setFont(f)
-        title.setStyleSheet(f"color: {Theme.text}; padding-bottom: 2px;")
-        layout.addWidget(title)
+        title.setStyleSheet(f"color: {Theme.text}; padding-bottom: 2px; padding-left: 2px;")
+        title_bar.addWidget(title)
+        title_bar.addStretch()
+        layout.addLayout(title_bar)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -106,13 +125,15 @@ class NoteViewer(QDialog):
 
         # Bottom
         bottom = QHBoxLayout()
-        bg_btn = QPushButton("🖼 背景")
+        bg_btn = QPushButton(" 背景")
+        bg_btn.setIcon(icon("background", Theme.muted, 15))
         bg_btn.setToolTip("设置背景图片")
         bg_btn.setStyleSheet(chip_button_style(Theme.success))
         bg_btn.clicked.connect(self._on_set_bg)
         bottom.addWidget(bg_btn)
 
-        reset_btn = QPushButton("↩ 默认")
+        reset_btn = QPushButton(" 默认")
+        reset_btn.setIcon(icon("reset", Theme.muted, 15))
         reset_btn.setToolTip("恢复默认背景")
         reset_btn.setStyleSheet(chip_button_style(Theme.muted))
         reset_btn.clicked.connect(self._on_reset_bg)
@@ -147,18 +168,39 @@ class NoteViewer(QDialog):
         _btn_font.setPointSize(9)
         _btn_font.setBold(True)
 
-        def _icon_btn(icon, size, normal_css, hover_css, on_click):
-            lbl = QLabel(icon)
-            lbl.setFont(_btn_font)
-            lbl.setFixedSize(size, size)
+        def _icon_btn(name, icon_color, hover_color, bg_normal, bg_hover, border_hover, on_click, glyph_size=16):
+            """Round icon button rendered from a tinted Lucide SVG."""
+            lbl = QLabel()
+            lbl.setFixedSize(24, 24)
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setCursor(QCursor(Qt.PointingHandCursor))
-            lbl.setStyleSheet(normal_css)
-            lbl._hover_css = hover_css
-            lbl._normal_css = normal_css
+            lbl._name = name
+            lbl._glyph_size = glyph_size
+            lbl._icon_color = icon_color
+            lbl._hover_color = hover_color
+            lbl._rotation = 0
+            lbl._normal_css = (
+                f"QLabel {{ background: {bg_normal}; "
+                "border: 1px solid rgba(31,41,55,0.16); border-radius: 12px; }"
+            )
+            lbl._hover_css = (
+                f"QLabel {{ background: {bg_hover}; "
+                f"border: 1px solid {border_hover}; border-radius: 12px; }}"
+            )
+            lbl.setStyleSheet(lbl._normal_css)
+            lbl.setPixmap(icon_pixmap(name, icon_color, glyph_size))
             lbl._clicked = on_click
-            lbl.enterEvent = lambda e, l=lbl: l.setStyleSheet(l._hover_css)
-            lbl.leaveEvent = lambda e, l=lbl: l.setStyleSheet(l._normal_css)
+
+            def _enter(e, l=lbl):
+                l.setStyleSheet(l._hover_css)
+                l.setPixmap(_rotated(icon_pixmap(l._name, l._hover_color, l._glyph_size), l._rotation))
+
+            def _leave(e, l=lbl):
+                l.setStyleSheet(l._normal_css)
+                l.setPixmap(_rotated(icon_pixmap(l._name, l._icon_color, l._glyph_size), l._rotation))
+
+            lbl.enterEvent = _enter
+            lbl.leaveEvent = _leave
             lbl.mousePressEvent = lambda e, l=lbl: l._clicked()
             return lbl
 
@@ -183,10 +225,10 @@ class NoteViewer(QDialog):
         hl.addWidget(date_label)
 
         expand_btn = _icon_btn(
-            "▶", 24,
-            "QLabel { color: #1e293b; background: rgba(31,41,55,0.06); border: 1px solid rgba(31,41,55,0.16); border-radius: 12px; }",
-            "QLabel { color: #4f7cff; background: rgba(79,124,255,0.18); border: 1px solid rgba(79,124,255,0.42); border-radius: 12px; }",
+            "chevron-down", "#64748b", Theme.accent,
+            "rgba(31,41,55,0.06)", "rgba(255,122,89,0.16)", "rgba(255,122,89,0.42)",
             lambda: None,
+            glyph_size=16,
         )
         hl.addWidget(expand_btn)
 
@@ -202,20 +244,22 @@ class NoteViewer(QDialog):
         nid = note["id"]
         bar_row = QHBoxLayout()
 
-        md_toggle = QPushButton("📄 显示Markdown")
+        md_toggle = QPushButton(" 显示Markdown")
+        md_toggle.setIcon(icon("note", Theme.muted, 14))
         md_toggle.setCheckable(True)
         md_font = QF()
         md_font.setPointSize(9)
         md_toggle.setFont(md_font)
         md_toggle.setStyleSheet(
             f"QPushButton {{ color: {Theme.muted}; background: rgba(255,255,255,0.72); border: 1px solid {Theme.border}; border-radius: 7px; padding: 3px 10px; font-size: 10px; }}"
-            f"QPushButton:hover {{ color: {Theme.accent}; border-color: rgba(79,124,255,0.30); background: rgba(79,124,255,0.10); }}"
-            f"QPushButton:checked {{ color: {Theme.accent}; background: rgba(79,124,255,0.10); border-color: rgba(79,124,255,0.30); }}"
+            f"QPushButton:hover {{ color: {Theme.accent}; border-color: rgba(255,122,89,0.30); background: rgba(255,122,89,0.10); }}"
+            f"QPushButton:checked {{ color: {Theme.accent}; background: rgba(255,122,89,0.10); border-color: rgba(255,122,89,0.30); }}"
         )
         bar_row.addWidget(md_toggle)
         bar_row.addStretch()
 
-        del_btn = QPushButton("删除此笔记")
+        del_btn = QPushButton(" 删除此笔记")
+        del_btn.setIcon(icon("trash", Theme.muted, 14))
         del_font = QF()
         del_font.setPointSize(9)
         del_btn.setFont(del_font)
@@ -254,11 +298,13 @@ class NoteViewer(QDialog):
                 preview.setHtml(f"<div style='line-height:1.4;'>{md_to_html(content_edit.toPlainText())}</div>")
                 content_edit.hide()
                 preview.show()
-                md_toggle.setText("📝 显示原文")
+                md_toggle.setText(" 显示原文")
+                md_toggle.setIcon(icon("eye", Theme.accent, 14))
             else:
                 preview.hide()
                 content_edit.show()
-                md_toggle.setText("📄 显示Markdown")
+                md_toggle.setText(" 显示Markdown")
+                md_toggle.setIcon(icon("note", Theme.accent, 14))
         md_toggle.toggled.connect(toggle_md)
 
         outer.addWidget(detail)
@@ -267,17 +313,18 @@ class NoteViewer(QDialog):
             QWidget#noteRow {{
                 background: #fefaf5;
                 border: 1px solid rgba(180,140,100,0.18);
-                border-radius: 14px;
+                border-radius: 16px;
             }}
             QWidget#noteRow:hover {{
                 background: #fff7ef;
-                border-color: rgba(79,124,255,0.34);
+                border-color: rgba(255,122,89,0.38);
             }}
         """)
 
         def toggle(checked=None, d=detail, btn=expand_btn):
             d.setVisible(not d.isVisible())
-            btn.setText("▼" if d.isVisible() else "▶")
+            btn._rotation = 180 if d.isVisible() else 0
+            btn.setPixmap(_rotated(icon_pixmap(btn._name, btn._hover_color, btn._glyph_size), btn._rotation))
         expand_btn._clicked = toggle
         expand_btn.setToolTip("展开/收起")
 

@@ -167,22 +167,14 @@ class OpenAIClient:
         logger = logging.getLogger("hachicat")
         try:
             url = self._url("/models")
-            logger.info("Fetching models from %s", url)
             r = self._client.get(url, timeout=10.0)
-            logger.info("Models response: status=%d", r.status_code)
             if r.status_code == 200:
                 data = r.json()
-                logger.info("Models data keys: %s", list(data.keys()))
                 raw = data.get("data", [])
-                models = []
-                for m in raw:
-                    mid = m.get("id", "")
-                    if mid:
-                        models.append(mid)
-                logger.info("Found %d models: %s", len(models), models[:5])
+                models = [m.get("id", "") for m in raw if m.get("id")]
+                logger.debug("Fetched %d models from %s", len(models), url)
                 return sorted(models)
-            else:
-                logger.warning("Model list failed: %s", r.text[:200])
+            logger.warning("Model list failed (%d): %s", r.status_code, r.text[:200])
             return []
         except Exception as e:
             logger.error("list_models error: %s", e)

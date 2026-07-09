@@ -138,7 +138,7 @@ class FrameAnimator(QObject):
 
         # Adjust timer interval for next frame
         durations = self._current_state.frame_durations
-        if self._timer.isActive():
+        if self._timer.isActive() and durations:
             idx = self._current_frame_index % len(durations)
             self._timer.setInterval(durations[idx])
 
@@ -156,7 +156,8 @@ class FrameAnimator(QObject):
 
     def resume(self) -> None:
         """Resume after being stopped."""
-        if self._current_state and self._current_state.frame_count > 1:
+        if (self._current_state and self._current_state.frame_count > 1
+                and self._current_state.frame_durations):
             idx = self._current_frame_index % len(self._current_state.frame_durations)
             self._timer.start(self._current_state.frame_durations[idx])
 

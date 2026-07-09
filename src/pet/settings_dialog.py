@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QCursor
 
 from src.memory.config import ConfigManager, Settings
-from src.utils.theme import app_window_style, button_style, form_field_style, group_box_style
+from src.utils.theme import Theme, app_window_style, button_style, form_field_style, group_box_style
+from src.utils.icons import icon, icon_pixmap
 
 
 class _HotkeyCapture(QLineEdit):
@@ -33,7 +34,7 @@ class _HotkeyCapture(QLineEdit):
                 padding: 6px 10px;
             }
             QLineEdit:focus {
-                border-color: #4f7cff; background: #f8faff;
+                border-color: #ff7a59; background: #fff7f3;
             }
         """)
 
@@ -92,16 +93,25 @@ class SettingsDialog(QDialog):
         layout.setSpacing(12)
 
         # Title
-        title = QLabel("🐱 HaChiCat 设置")
+        title_bar = QHBoxLayout()
+        title_bar.setContentsMargins(0, 0, 0, 0)
+        title_bar.setSpacing(6)
+        title_icon = QLabel()
+        title_icon.setPixmap(icon_pixmap("settings", Theme.accent, 22))
+        title_icon.setStyleSheet("background: transparent;")
+        title_bar.addWidget(title_icon)
+        title = QLabel("HaChiCat 设置")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         title.setFont(title_font)
         title.setStyleSheet("color: #111827; padding: 2px 0 4px 0;")
-        layout.addWidget(title)
+        title_bar.addWidget(title)
+        title_bar.addStretch()
+        layout.addLayout(title_bar)
 
         # ---- LLM Group ----
-        llm_group = QGroupBox("🤖 大模型配置")
+        llm_group = QGroupBox("大模型配置")
         llm_form = QFormLayout(llm_group)
         llm_form.setSpacing(8)
 
@@ -122,7 +132,8 @@ class SettingsDialog(QDialog):
         self._api_key_edit = QLineEdit()
         self._api_key_edit.setEchoMode(QLineEdit.Password)
         self._api_key_edit.setPlaceholderText("输入 API Key...")
-        self._show_key_btn = QPushButton("👁")
+        self._show_key_btn = QPushButton()
+        self._show_key_btn.setIcon(icon("eye", Theme.muted, 15))
         self._show_key_btn.setFixedWidth(38)
         self._show_key_btn.setCheckable(True)
         self._show_key_btn.toggled.connect(self._toggle_key_visibility)
@@ -141,7 +152,7 @@ class SettingsDialog(QDialog):
             QAbstractItemView {
                 background: #ffffff; color: #1f2937;
                 border: 1px solid rgba(31,41,55,0.14); border-radius: 8px;
-                selection-background-color: rgba(79,124,255,0.14);
+                selection-background-color: rgba(255,122,89,0.16);
                 selection-color: #1f2937;
                 outline: none; padding: 4px;
                 min-height: 28px;
@@ -151,18 +162,18 @@ class SettingsDialog(QDialog):
         self._model_combo.lineEdit().setPlaceholderText("deepseek-chat")
         model_layout.addWidget(self._model_combo, 1)
 
-        self._detect_btn = QLabel("🔍 检测模型")
+        self._detect_btn = QPushButton(" 检测模型")
+        self._detect_btn.setIcon(icon("detect", Theme.muted, 14))
         self._detect_btn.setToolTip("从 API 获取可用模型列表")
-        self._detect_btn.setAlignment(Qt.AlignCenter)
         self._detect_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._detect_btn.setStyleSheet("""
-            QLabel { color: #1e293b; background: rgba(255,255,255,0.82);
+            QPushButton { color: #1e293b; background: rgba(255,255,255,0.82);
                      border: 1px solid rgba(31,41,55,0.14); border-radius: 7px;
                      font-size: 11px; padding: 4px 10px; }
-            QLabel:hover { background: rgba(79,124,255,0.14); color: #4f7cff;
-                           border-color: rgba(79,124,255,0.34); }
+            QPushButton:hover { background: rgba(255,122,89,0.14); color: #ff7a59;
+                           border-color: rgba(255,122,89,0.34); }
         """)
-        self._detect_btn.mousePressEvent = lambda e: self._on_detect_models()
+        self._detect_btn.clicked.connect(self._on_detect_models)
         model_layout.addWidget(self._detect_btn)
         llm_form.addRow("模型:", model_layout)
 
@@ -197,7 +208,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(llm_group)
 
         # ---- Pet Group ----
-        pet_group = QGroupBox("🐱 宠物设置")
+        pet_group = QGroupBox("宠物设置")
         pet_form = QFormLayout(pet_group)
         pet_form.setSpacing(8)
 
@@ -256,8 +267,8 @@ class SettingsDialog(QDialog):
             QLabel { color: #1e293b; background: rgba(255,255,255,0.82);
                      border: 1px solid rgba(31,41,55,0.14); border-radius: 7px;
                      font-size: 12px; padding: 4px 10px; }
-            QLabel:hover { background: rgba(79,124,255,0.14); color: #4f7cff;
-                           border-color: rgba(79,124,255,0.34); }
+            QLabel:hover { background: rgba(255,122,89,0.14); color: #ff7a59;
+                           border-color: rgba(255,122,89,0.34); }
         """)
         self._skin_btn.mousePressEvent = lambda e: self._show_skin_picker()
         skin_layout.addWidget(self._skin_btn)
@@ -267,7 +278,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(pet_group)
 
         # ---- Reminder Group ----
-        rem_group = QGroupBox("⏰ 提醒设置")
+        rem_group = QGroupBox("提醒设置")
         rem_form = QFormLayout(rem_group)
         rem_form.setSpacing(8)
 
@@ -337,7 +348,7 @@ class SettingsDialog(QDialog):
             card.setFixedSize(120, 170)
             card.setStyleSheet("""
                 QWidget { background: rgba(255,255,255,0.88); border: 1px solid rgba(31,41,55,0.10); border-radius: 10px; }
-                QWidget:hover { background: rgba(79,124,255,0.08); border-color: rgba(79,124,255,0.34); }
+                QWidget:hover { background: rgba(255,122,89,0.08); border-color: rgba(255,122,89,0.34); }
             """)
             card.setCursor(QCursor(Qt.PointingHandCursor))
             vl = QVBoxLayout(card)
@@ -386,31 +397,31 @@ class SettingsDialog(QDialog):
                 btn_row.setSpacing(4)
                 btn_row.addStretch()
                 # Flip
-                flip_btn = QLabel("↔")
+                flip_btn = QLabel()
+                flip_btn.setPixmap(icon_pixmap("flip", "#6b7280", 13))
                 flip_btn.setAlignment(Qt.AlignCenter)
                 flip_btn.setCursor(QCursor(Qt.PointingHandCursor))
                 flip_btn.setToolTip("水平翻转")
                 flip_btn.setFixedSize(22, 18)
                 flip_btn.setStyleSheet("""
-                    QLabel { color: #6b7280; background: rgba(31,41,55,0.04);
-                             border: 1px solid rgba(31,41,55,0.08); border-radius: 3px;
-                             font-size: 11px; }
-                    QLabel:hover { background: rgba(79,124,255,0.14); color: #4f7cff; }
+                    QLabel { background: rgba(31,41,55,0.04);
+                             border: 1px solid rgba(31,41,55,0.08); border-radius: 3px; }
+                    QLabel:hover { background: rgba(255,122,89,0.14); }
                 """)
                 def make_flip(s=skin):
                     return lambda e: self._flip_skin(s)
                 flip_btn.mousePressEvent = make_flip()
                 btn_row.addWidget(flip_btn)
                 # Delete
-                del_btn = QLabel("✕")
+                del_btn = QLabel()
+                del_btn.setPixmap(icon_pixmap("trash", "#c26666", 13))
                 del_btn.setAlignment(Qt.AlignCenter)
                 del_btn.setCursor(QCursor(Qt.PointingHandCursor))
                 del_btn.setToolTip("删除")
                 del_btn.setFixedSize(22, 18)
                 del_btn.setStyleSheet("""
-                    QLabel { color: #c26666; background: rgba(194,102,102,0.04);
-                             border: 1px solid rgba(194,102,102,0.10); border-radius: 3px;
-                             font-size: 11px; }
+                    QLabel { background: rgba(194,102,102,0.04);
+                             border: 1px solid rgba(194,102,102,0.10); border-radius: 3px; }
                     QLabel:hover { background: rgba(194,102,102,0.14); }
                 """)
                 def make_del(s=skin):
@@ -434,10 +445,10 @@ class SettingsDialog(QDialog):
         add_btn.setAlignment(Qt.AlignCenter)
         add_btn.setCursor(QCursor(Qt.PointingHandCursor))
         add_btn.setStyleSheet("""
-            QLabel { color: #4f7cff; background: rgba(79,124,255,0.08);
-                     border: 1px dashed rgba(79,124,255,0.30); border-radius: 8px;
+            QLabel { color: #ff7a59; background: rgba(255,122,89,0.08);
+                     border: 1px dashed rgba(255,122,89,0.30); border-radius: 8px;
                      font-size: 12px; padding: 6px; }
-            QLabel:hover { background: rgba(79,124,255,0.16); border-color: #4f7cff; }
+            QLabel:hover { background: rgba(255,122,89,0.16); border-color: #ff7a59; }
         """)
         add_btn.mousePressEvent = lambda e: self._add_petdex_pet(dlg)
         layout.addWidget(add_btn)
@@ -507,7 +518,7 @@ class SettingsDialog(QDialog):
         url_edit.setStyleSheet("""
             QLineEdit { background: #2a2a2a; color: #ffffff; border: 1px solid #444;
                         border-radius: 6px; padding: 8px 12px; font-size: 13px; }
-            QLineEdit:focus { border-color: #4f7cff; }
+            QLineEdit:focus { border-color: #ff7a59; }
         """)
         url_layout.addWidget(url_edit, 1)
 
@@ -516,7 +527,7 @@ class SettingsDialog(QDialog):
         go_btn.setCursor(QCursor(Qt.PointingHandCursor))
         go_btn.setFixedSize(50, 36)
         go_btn.setStyleSheet("""
-            QLabel { color: #ffffff; background: #4f7cff; border-radius: 6px;
+            QLabel { color: #ffffff; background: #ff7a59; border-radius: 6px;
                      font-size: 13px; font-weight: bold; }
             QLabel:hover { background: #3f66d1; }
         """)
@@ -526,7 +537,7 @@ class SettingsDialog(QDialog):
         # Status
         status = QLabel("")
         status.setAlignment(Qt.AlignCenter)
-        status.setStyleSheet("color: #4f7cff; font-size: 12px;")
+        status.setStyleSheet("color: #ff7a59; font-size: 12px;")
         layout.addWidget(status)
 
         layout.addStretch()
@@ -570,25 +581,21 @@ class SettingsDialog(QDialog):
                 status.setText(f"❌ 下载失败: {e3}")
                 return
 
-            cols, rows, fw, fh = 9, 8, 192, 208
-            try:
-                req3 = urllib.request.Request(json_url, headers={"User-Agent": "HaChiCat/1.0"})
-                with urllib.request.urlopen(req3, timeout=10) as r3:
-                    pj = json.loads(r3.read())
-                    fw = pj.get("frameWidth", fw); fh = pj.get("frameHeight", fh)
-                    cols = pj.get("columns", cols)
-                    states = pj.get("animationStates", ["idle"])
-                    state_names = [s.get("name", s) if isinstance(s, dict) else str(s) for s in states] if isinstance(states, list) else ["idle"]
-                    rows = len(state_names)
-            except Exception:
-                state_names = ["idle","wave","run","failed","review","jump","extra1","extra2"]
+            # Official Petdex 9-row sprite layout: (name, frame_count)
+            petdex_rows = [
+                ("idle", 6), ("run_right", 8), ("run_left", 8),
+                ("waving", 4), ("jumping", 5), ("failed", 8),
+                ("waiting", 6), ("running", 6), ("review", 6),
+            ]
+            fw, fh = 192, 208
 
             (pet_dir / "sprite_config.json").write_text(json.dumps({
-                "cell_width": fw, "cell_height": fh, "columns": cols, "rows": rows,
-                "default_state": state_names[0] if state_names else "idle",
-                "states": [{"name": sn, "row": i, "frame_count": min(cols, 6),
-                            "frame_durations": [180]*min(cols, 6), "loop": True}
-                           for i, sn in enumerate(state_names)]
+                "cell_width": fw, "cell_height": fh, "columns": 8,
+                "rows": len(petdex_rows),
+                "default_state": "idle",
+                "states": [{"name": name, "row": i, "frame_count": fc,
+                            "frame_durations": [120]*fc, "loop": True}
+                           for i, (name, fc) in enumerate(petdex_rows)]
             }, indent=2, ensure_ascii=False), encoding="utf-8")
 
             status.setText(f"✅ 已添加 {safe_slug}！")
@@ -627,7 +634,7 @@ class SettingsDialog(QDialog):
             card.setFixedSize(120, 170)
             card.setStyleSheet("""
                 QWidget { background: rgba(255,255,255,0.88); border: 1px solid rgba(31,41,55,0.10); border-radius: 10px; }
-                QWidget:hover { background: rgba(79,124,255,0.08); border-color: rgba(79,124,255,0.34); }
+                QWidget:hover { background: rgba(255,122,89,0.08); border-color: rgba(255,122,89,0.34); }
             """)
             card.setCursor(QCursor(Qt.PointingHandCursor))
             vl = QVBoxLayout(card)
@@ -680,21 +687,21 @@ class SettingsDialog(QDialog):
                     QLabel { color: #6b7280; background: rgba(31,41,55,0.04);
                              border: 1px solid rgba(31,41,55,0.08); border-radius: 3px;
                              font-size: 11px; }
-                    QLabel:hover { background: rgba(79,124,255,0.14); color: #4f7cff; }
+                    QLabel:hover { background: rgba(255,122,89,0.14); color: #ff7a59; }
                 """)
                 def make_flip(s=skin):
                     return lambda e: self._flip_skin(s)
                 flip_btn.mousePressEvent = make_flip()
                 btn_row.addWidget(flip_btn)
-                del_btn = QLabel("✕")
+                del_btn = QLabel()
+                del_btn.setPixmap(icon_pixmap("trash", "#c26666", 13))
                 del_btn.setAlignment(Qt.AlignCenter)
                 del_btn.setCursor(QCursor(Qt.PointingHandCursor))
                 del_btn.setToolTip("删除")
                 del_btn.setFixedSize(22, 18)
                 del_btn.setStyleSheet("""
-                    QLabel { color: #c26666; background: rgba(194,102,102,0.04);
-                             border: 1px solid rgba(194,102,102,0.10); border-radius: 3px;
-                             font-size: 11px; }
+                    QLabel { background: rgba(194,102,102,0.04);
+                             border: 1px solid rgba(194,102,102,0.10); border-radius: 3px; }
                     QLabel:hover { background: rgba(194,102,102,0.14); }
                 """)
                 def make_del(s=skin):
@@ -807,8 +814,8 @@ class SettingsDialog(QDialog):
             QLabel { color: #1e293b; background: rgba(255,255,255,0.82);
                      border: 1px solid rgba(31,41,55,0.14); border-radius: 7px;
                      font-size: 16px; font-weight: bold; }
-            QLabel:hover { background: rgba(79,124,255,0.14); color: #4f7cff;
-                           border-color: rgba(79,124,255,0.34); }
+            QLabel:hover { background: rgba(255,122,89,0.14); color: #ff7a59;
+                           border-color: rgba(255,122,89,0.34); }
         """)
         return btn
 
@@ -936,10 +943,11 @@ class SettingsDialog(QDialog):
 
     @staticmethod
     def _safe_btn_restore(btn, text: str) -> None:
-        """Restore button text only if the widget still exists."""
+        """Restore button text (and detect icon) only if the widget still exists."""
         import shiboken6
         if shiboken6.isValid(btn):
             btn.setText(text)
+            btn.setIcon(icon("detect", Theme.muted, 14))
 
     def _on_detect_models(self) -> None:
         """Fetch model list from the API and populate the combo box."""
@@ -950,7 +958,7 @@ class SettingsDialog(QDialog):
         api_base = self._api_base_edit.text().strip().rstrip("/") or self._api_base_edit.placeholderText()
         if not api_key:
             self._detect_btn.setText("请先填 Key")
-            QTimer.singleShot(1500, lambda b=self._detect_btn: self._safe_btn_restore(b, "🔍 检测模型"))
+            QTimer.singleShot(1500, lambda b=self._detect_btn: self._safe_btn_restore(b, " 检测模型"))
             return
 
         # Show loading state
@@ -968,7 +976,10 @@ class SettingsDialog(QDialog):
                 model="",
             )
             client = OpenAIClient(cfg)
-            models = client.list_models()
+            try:
+                models = client.list_models()
+            finally:
+                client.close()
             if models:
                 self._model_combo.clear()
                 self._model_combo.addItems(models)
@@ -977,13 +988,13 @@ class SettingsDialog(QDialog):
                 self._settings.llm.cached_models = models
                 self._config.save(self._settings)
                 btn.setText(f"✅ {len(models)}个")
-                QTimer.singleShot(2500, lambda b=btn: self._safe_btn_restore(b, "🔍 检测模型"))
+                QTimer.singleShot(2500, lambda b=btn: self._safe_btn_restore(b, " 检测模型"))
             else:
                 btn.setText("⚠ 无模型")
-                QTimer.singleShot(2500, lambda b=btn: self._safe_btn_restore(b, "🔍 检测模型"))
+                QTimer.singleShot(2500, lambda b=btn: self._safe_btn_restore(b, " 检测模型"))
         except Exception as e:
             btn.setText(f"❌ {str(e)[:10]}")
-            QTimer.singleShot(3000, lambda b=btn: self._safe_btn_restore(b, "🔍 检测模型"))
+            QTimer.singleShot(3000, lambda b=btn: self._safe_btn_restore(b, " 检测模型"))
 
     def _on_provider_changed(self, provider: str) -> None:
         """Auto-fill model + API base when switching providers."""
@@ -1021,7 +1032,7 @@ class SettingsDialog(QDialog):
         """Show/hide API key."""
         if checked:
             self._api_key_edit.setEchoMode(QLineEdit.Normal)
-            self._show_key_btn.setText("🙈")
+            self._show_key_btn.setIcon(icon("hide", Theme.accent, 15))
         else:
             self._api_key_edit.setEchoMode(QLineEdit.Password)
-            self._show_key_btn.setText("👁")
+            self._show_key_btn.setIcon(icon("eye", Theme.muted, 15))

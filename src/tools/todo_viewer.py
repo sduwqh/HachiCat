@@ -6,24 +6,34 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QScrollArea, QWidget, QCheckBox,
-    QSizePolicy, QInputDialog, QFileDialog, QSlider,
+    QSizePolicy, QFileDialog, QSlider,
 )
 from PySide6.QtGui import QFont, QPixmap, QPalette, QBrush
 
 from src.memory.database import Database
-from src.utils.theme import Theme, button_style, chip_button_style
+from src.utils.theme import Theme, button_style, chip_button_style, app_window_style, form_field_style
+from src.utils.icons import icon, icon_pixmap
 
 CARD_STYLE = """
     QWidget#todoRow {
         background: #fefaf5;
         border: 1px solid rgba(180,140,100,0.18);
-        border-radius: 14px;
+        border-radius: 16px;
     }
     QWidget#todoRow:hover {
         background: #fff7ef;
-        border-color: rgba(79,124,255,0.34);
+        border-color: rgba(255,122,89,0.38);
     }
 """
+
+
+def _rotated(pm, deg):
+    """Rotate a pixmap while preserving its device pixel ratio."""
+    from PySide6.QtGui import QTransform
+    dpr = pm.devicePixelRatio()
+    out = pm.transformed(QTransform().rotate(deg), Qt.SmoothTransformation)
+    out.setDevicePixelRatio(dpr)
+    return out
 
 
 class TodoViewer(QDialog):
@@ -37,7 +47,7 @@ class TodoViewer(QDialog):
         self._bg_pixmap = None
         self._on_bg_changed = on_bg_changed  # callback(bg_path) to persist
 
-        self.setWindowTitle("📋 待办事项")
+        self.setWindowTitle("待办事项")
         self.setMinimumSize(440, 380)
         self.setWindowFlags(
             Qt.Tool
@@ -97,14 +107,19 @@ class TodoViewer(QDialog):
 
         # Header
         header = QHBoxLayout()
-        title = QLabel("📋 待办事项")
+        title_icon = QLabel()
+        title_icon.setPixmap(icon_pixmap("todo", Theme.accent, 20))
+        title_icon.setStyleSheet("background: transparent;")
+        header.addWidget(title_icon)
+        title = QLabel("待办事项")
         f = QFont(); f.setPointSize(14); f.setBold(True)
         title.setFont(f)
-        title.setStyleSheet(f"color: {Theme.text}; padding-bottom: 2px;")
+        title.setStyleSheet(f"color: {Theme.text}; padding-bottom: 2px; padding-left: 4px;")
         header.addWidget(title)
         header.addStretch()
 
-        add_btn = QPushButton("➕ 添加")
+        add_btn = QPushButton(" 添加")
+        add_btn.setIcon(icon("add", "#ffffff", 16))
         add_btn.setStyleSheet(button_style("primary"))
         add_btn.clicked.connect(self._on_add)
         header.addWidget(add_btn)
@@ -128,7 +143,8 @@ class TodoViewer(QDialog):
 
         # Bottom bar
         bottom = QHBoxLayout()
-        self._completed_toggle = QPushButton("📁 显示已完成")
+        self._completed_toggle = QPushButton(" 显示已完成")
+        self._completed_toggle.setIcon(icon("eye", Theme.muted, 15))
         self._completed_toggle.setCheckable(True)
         self._completed_toggle.toggled.connect(self._on_toggle_completed)
         self._completed_toggle.setStyleSheet(
@@ -137,13 +153,15 @@ class TodoViewer(QDialog):
         )
         bottom.addWidget(self._completed_toggle)
 
-        bg_btn = QPushButton("🖼 背景")
+        bg_btn = QPushButton(" 背景")
+        bg_btn.setIcon(icon("background", Theme.muted, 15))
         bg_btn.setToolTip("设置背景图片")
         bg_btn.setStyleSheet(chip_button_style(Theme.success))
         bg_btn.clicked.connect(self._on_set_bg)
         bottom.addWidget(bg_btn)
 
-        reset_btn = QPushButton("↩ 默认")
+        reset_btn = QPushButton(" 默认")
+        reset_btn.setIcon(icon("reset", Theme.muted, 15))
         reset_btn.setToolTip("恢复默认背景")
         reset_btn.setStyleSheet(chip_button_style(Theme.muted))
         reset_btn.clicked.connect(self._on_reset_bg)
@@ -192,18 +210,39 @@ class TodoViewer(QDialog):
         _btn_font.setPointSize(9)
         _btn_font.setBold(True)
 
-        def _icon_btn(icon, size, normal_css, hover_css, on_click):
-            lbl = QLabel(icon)
-            lbl.setFont(_btn_font)
-            lbl.setFixedSize(size, size)
+        def _icon_btn(name, icon_color, hover_color, bg_normal, bg_hover, border_hover, on_click, glyph_size=15):
+            """Round icon button rendered from a tinted Lucide SVG."""
+            lbl = QLabel()
+            lbl.setFixedSize(24, 24)
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setCursor(QCursor(Qt.PointingHandCursor))
-            lbl.setStyleSheet(normal_css)
-            lbl._hover_css = hover_css
-            lbl._normal_css = normal_css
+            lbl._name = name
+            lbl._glyph_size = glyph_size
+            lbl._icon_color = icon_color
+            lbl._hover_color = hover_color
+            lbl._normal_css = (
+                f"QLabel {{ background: {bg_normal}; "
+                "border: 1px solid rgba(31,41,55,0.16); border-radius: 12px; }"
+            )
+            lbl._hover_css = (
+                f"QLabel {{ background: {bg_hover}; "
+                f"border: 1px solid {border_hover}; border-radius: 12px; }}"
+            )
+            lbl.setStyleSheet(lbl._normal_css)
+            lbl._rotation = 0
+            lbl.setPixmap(icon_pixmap(name, icon_color, glyph_size))
             lbl._clicked = on_click
-            lbl.enterEvent = lambda e, l=lbl: l.setStyleSheet(l._hover_css)
-            lbl.leaveEvent = lambda e, l=lbl: l.setStyleSheet(l._normal_css)
+
+            def _enter(e, l=lbl):
+                l.setStyleSheet(l._hover_css)
+                l.setPixmap(_rotated(icon_pixmap(l._name, l._hover_color, l._glyph_size), l._rotation))
+
+            def _leave(e, l=lbl):
+                l.setStyleSheet(l._normal_css)
+                l.setPixmap(_rotated(icon_pixmap(l._name, l._icon_color, l._glyph_size), l._rotation))
+
+            lbl.enterEvent = _enter
+            lbl.leaveEvent = _leave
             lbl.mousePressEvent = lambda e, l=lbl: l._clicked()
             return lbl
 
@@ -231,10 +270,10 @@ class TodoViewer(QDialog):
                 background: rgba(255,255,255,0.6);
             }
             QCheckBox::indicator:checked {
-                background: #4f7cff; border-color: #3f66d1;
+                background: #ff7a59; border-color: #f2603c;
             }
             QCheckBox::indicator:hover {
-                border-color: #4f7cff;
+                border-color: #ff7a59;
             }
         """)
         if not done:
@@ -263,20 +302,20 @@ class TodoViewer(QDialog):
         desc = todo.get("description", "")
 
         expand_btn = _icon_btn(
-            "▶", 24,
-            "QLabel { color: #1e293b; background: rgba(31,41,55,0.06); border: 1px solid rgba(31,41,55,0.16); border-radius: 12px; }",
-            "QLabel { color: #4f7cff; background: rgba(79,124,255,0.18); border: 1px solid rgba(79,124,255,0.42); border-radius: 12px; }",
+            "chevron-down", "#64748b", Theme.accent,
+            "rgba(31,41,55,0.06)", "rgba(255,122,89,0.16)", "rgba(255,122,89,0.42)",
             lambda: None,  # set by toggle below
+            glyph_size=16,
         )
         main_layout.addWidget(expand_btn)
 
         # Delete button (on completed items only)
         if done:
             del_btn = _icon_btn(
-                "✕", 24,
-                "QLabel { color: #1e293b; background: rgba(31,41,55,0.06); border: 1px solid rgba(31,41,55,0.16); border-radius: 12px; }",
-                "QLabel { color: #c26666; background: rgba(194,102,102,0.18); border: 1px solid rgba(194,102,102,0.42); border-radius: 12px; }",
+                "trash", "#64748b", Theme.danger,
+                "rgba(31,41,55,0.06)", "rgba(194,102,102,0.16)", "rgba(194,102,102,0.42)",
                 lambda tid=todo["id"]: self._on_delete(tid),
+                glyph_size=14,
             )
             del_btn.setToolTip("永久删除")
             main_layout.addWidget(del_btn)
@@ -337,20 +376,83 @@ class TodoViewer(QDialog):
 
         def toggle(checked=None, d=detail, btn=expand_btn):
             d.setVisible(not d.isVisible())
-            btn.setText("▼" if d.isVisible() else "▶")
+            btn._rotation = 180 if d.isVisible() else 0
+            btn.setPixmap(_rotated(icon_pixmap(btn._name, btn._hover_color, btn._glyph_size), btn._rotation))
         expand_btn._clicked = toggle
         expand_btn.setToolTip("展开/收起")
 
         return row
 
     def _on_add(self) -> None:
-        text, ok = QInputDialog.getText(self, "添加待办", "请输入待办内容:")
-        if ok and text.strip():
-            self._db.insert(
-                "INSERT INTO todos (title, status, source) VALUES (?, 'pending', 'viewer')",
-                (text.strip(),),
-            )
-            self.refresh()
+        """Add a todo via a rich dialog: title (required), due date, description."""
+        from PySide6.QtWidgets import QLineEdit, QTextEdit
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("添加待办")
+        # Tool-window style: title bar with a close button but no system icon
+        # (matches the viewer windows, which use Qt.Tool for the same reason).
+        dlg.setWindowFlags(Qt.Tool | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        dlg.setMinimumWidth(360)
+        dlg.setStyleSheet(app_window_style() + form_field_style())
+
+        dl = QVBoxLayout(dlg)
+        dl.setContentsMargins(18, 16, 18, 14)
+        dl.setSpacing(8)
+
+        heading = QLabel("添加待办")
+        hf = QFont(); hf.setPointSize(14); hf.setBold(True)
+        heading.setFont(hf)
+        heading.setStyleSheet(f"color: {Theme.text}; padding-bottom: 4px;")
+        dl.addWidget(heading)
+
+        # Title (required)
+        dl.addWidget(QLabel("标题 *"))
+        title_edit = QLineEdit()
+        title_edit.setPlaceholderText("待办标题（必填）")
+        dl.addWidget(title_edit)
+
+        # Due date (optional)
+        dl.addWidget(QLabel("截止时间"))
+        due_edit = QLineEdit()
+        due_edit.setPlaceholderText("如 2026-07-01 或 2026-07-01 15:00（可留空）")
+        dl.addWidget(due_edit)
+
+        # Description (optional)
+        dl.addWidget(QLabel("详细描述"))
+        desc_edit = QTextEdit()
+        desc_edit.setPlaceholderText("补充说明（可留空）...")
+        desc_edit.setMaximumHeight(120)
+        dl.addWidget(desc_edit)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setStyleSheet(button_style("neutral"))
+        cancel_btn.clicked.connect(dlg.reject)
+        btn_row.addWidget(cancel_btn)
+        ok_btn = QPushButton("添加")
+        ok_btn.setDefault(True)
+        ok_btn.setStyleSheet(button_style("primary"))
+        ok_btn.clicked.connect(dlg.accept)
+        btn_row.addWidget(ok_btn)
+        dl.addLayout(btn_row)
+
+        title_edit.setFocus()
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        title = title_edit.text().strip()
+        if not title:
+            return  # title is the only required field
+        due = due_edit.text().strip()
+        desc = desc_edit.toPlainText().strip()
+        self._db.insert(
+            "INSERT INTO todos (title, description, due_date, status, source) "
+            "VALUES (?, ?, ?, 'pending', 'viewer')",
+            (title, desc, due or None),
+        )
+        self.refresh()
 
     def _save_field(self, tid: int, field: str, value: str) -> None:
         if value.strip():
@@ -386,7 +488,10 @@ class TodoViewer(QDialog):
 
     def _on_toggle_completed(self, checked: bool) -> None:
         self._show_completed = checked
-        self._completed_toggle.setText("📂 隐藏已完成" if checked else "📁 显示已完成")
+        self._completed_toggle.setText(" 隐藏已完成" if checked else " 显示已完成")
+        self._completed_toggle.setIcon(
+            icon("hide" if checked else "eye", Theme.accent if checked else Theme.muted, 15)
+        )
         self.refresh()
 
     def _on_set_bg(self) -> None:

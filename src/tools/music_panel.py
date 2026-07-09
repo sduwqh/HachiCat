@@ -5,6 +5,7 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 
 from src.utils.theme import Theme, app_window_style, chip_button_style
+from src.utils.icons import icon
 
 VK = {"pp": 0xB3, "prev": 0xB1, "next": 0xB0}
 
@@ -33,8 +34,10 @@ class MusicPanel(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        for label, key in [("⏮", "prev"), ("▶⏸", "pp"), ("⏭", "next")]:
-            btn = QPushButton(label)
+        _icon_for = {"prev": "music-prev", "pp": "music-play", "next": "music-next"}
+        for key in ["prev", "pp", "next"]:
+            btn = QPushButton()
+            btn.setIcon(icon(_icon_for[key], Theme.accent, 16))
             btn.setToolTip({"prev":"上一首","pp":"播放/暂停","next":"下一首"}[key])
             btn.setStyleSheet(chip_button_style(Theme.accent))
             btn.clicked.connect(lambda checked=False, k=key: _send(VK[k]))

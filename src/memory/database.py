@@ -8,6 +8,7 @@ We use sqlite3 (Python built-in) for zero-dependency local storage.
 """
 
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,9 @@ class Database:
     def __init__(self, db_path: Path):
         self._path = db_path
         self._conn: sqlite3.Connection | None = None
+        # Serializes access across the main thread and background worker
+        # threads (LLM todo/tool execution) sharing one connection.
+        self._lock = threading.RLock()
 
     @property
     def conn(self) -> sqlite3.Connection:
@@ -100,28 +104,33 @@ class Database:
 
     def execute(self, sql: str, params: tuple | dict | None = None) -> sqlite3.Cursor:
         """Execute a SQL statement."""
-        return self.conn.execute(sql, params or ())
+        with self._lock:
+            return self.conn.execute(sql, params or ())
 
     def fetch_one(self, sql: str, params: tuple | dict | None = None) -> dict[str, Any] | None:
         """Fetch a single row as dict."""
-        row = self.conn.execute(sql, params or ()).fetchone()
+        with self._lock:
+            row = self.conn.execute(sql, params or ()).fetchone()
         return dict(row) if row else None
 
     def fetch_all(self, sql: str, params: tuple | dict | None = None) -> list[dict[str, Any]]:
         """Fetch all rows as list of dicts."""
-        return [dict(row) for row in self.conn.execute(sql, params or ()).fetchall()]
+        with self._lock:
+            return [dict(row) for row in self.conn.execute(sql, params or ()).fetchall()]
 
     def insert(self, sql: str, params: tuple | dict | None = None) -> int:
         """Execute insert and return lastrowid."""
-        cur = self.conn.execute(sql, params or ())
-        self.conn.commit()
-        return cur.lastrowid
+        with self._lock:
+            cur = self.conn.execute(sql, params or ())
+            self.conn.commit()
+            return cur.lastrowid
 
     def update(self, sql: str, params: tuple | dict | None = None) -> int:
         """Execute update/delete and return rowcount."""
-        cur = self.conn.execute(sql, params or ())
-        self.conn.commit()
-        return cur.rowcount
+        with self._lock:
+            cur = self.conn.execute(sql, params or ())
+            self.conn.commit()
+            return cur.rowcount
 
     def get_pet_state(self, key: str, default: str | None = None) -> str | None:
         """Get a pet state value by key."""
