@@ -492,9 +492,14 @@ def main() -> int:
         # (breath mode handled live via toggle, not from config)
         pet_window.set_snap_taskbar(s.pet.snap_to_taskbar)
         pet_window.set_skin_sizes(s.pet.skin_sizes)
-        pet_window.switch_skin(s.pet.skin, keep_scale=True)
-        if s.pet.skin == "HaChiCat":
-            pet_window._startup_greet()
+        # Only reload the skin when it actually changed. switch_skin re-runs
+        # setGeometry (repositioning the pet) and the startup greeting, so
+        # calling it on every save — e.g. after just toggling breath mode —
+        # would make the pet jump around.
+        if pet_window._current_skin_name != s.pet.skin:
+            pet_window.switch_skin(s.pet.skin, keep_scale=True)
+            if s.pet.skin == "HaChiCat":
+                pet_window._startup_greet()
         # LLM — recreate client if key/provider changed
         nonlocal llm_client, classifier
         new_llm = create_llm_client(LLMConfig(

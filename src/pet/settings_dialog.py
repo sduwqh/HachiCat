@@ -764,11 +764,14 @@ class SettingsDialog(QDialog):
             self._current_skin = skin
 
     def _on_breath_mode_toggled(self, checked: bool) -> None:
-        """Live toggle breath mode."""
+        """Live toggle breath mode.
+
+        Only flip the breath flag — do NOT run the full apply_settings_live
+        reload here. That path re-runs switch_skin (which repositions the pet)
+        and the startup greeting, which must not happen on a simple toggle.
+        """
         if self._pet_window:
             self._pet_window.set_breath_mode(checked)
-        if self._on_apply_live:
-            self._on_apply_live()
 
     def _on_size_click(self, value: int) -> None:
         """Apply pet size change — either a delta (±10) or absolute value."""

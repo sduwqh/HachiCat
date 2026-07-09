@@ -728,10 +728,24 @@ class PetWindow(QWidget):
             return
         self._breath_mode = enabled
         if enabled:
+            # Seed the near/away state from the current cursor position so we
+            # don't fire a stray "哈~" the instant the mode turns on.
+            self._breath_was_near = self._cursor_is_near()
             self._breath_timer.start(200)
         else:
             self._breath_timer.stop()
         self.breath_mode_changed.emit(enabled)
+
+    def _cursor_is_near(self) -> bool:
+        """True if the mouse cursor is currently within the breath threshold."""
+        import ctypes
+        from ctypes import wintypes
+        pt = wintypes.POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        cx = self.x() + self.width() // 2
+        cy = self.y() + self.height() // 2
+        dist = ((pt.x - cx) ** 2 + (pt.y - cy) ** 2) ** 0.5
+        return dist < max(self.width(), self.height()) * 0.85
 
     def _auto_breath_toggle(self) -> None:
         import random
@@ -768,33 +782,38 @@ class PetWindow(QWidget):
     def _breath_check(self) -> None:
         if not self._breath_mode or not self._is_hachicat:
             return
-        import ctypes, time as _time
+        import ctypes
         from ctypes import wintypes
         pt = wintypes.POINT()
         ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
         cx = self.x() + self.width() // 2
         cy = self.y() + self.height() // 2
         dist = ((pt.x - cx) ** 2 + (pt.y - cy) ** 2) ** 0.5
-        threshold = max(self.width(), self.height()) * 0.85
-        if dist < threshold:
+        near = dist < max(self.width(), self.height()) * 0.85
+        was_near = getattr(self, '_breath_was_near', False)
+        self._breath_was_near = near
+
+        if near:
+            # Feature: shove the cursor away when it gets close, and put on
+            # the "哈气" face while doing so.
             if self._alt_image_path and self._alt_image_path.exists():
                 self._pet_widget.swap_image(self._alt_image_path)
                 QTimer.singleShot(400, self._restore_sprite)
-            now = _time.time()
-            if now - getattr(self, '_breath_bubble_last', 0) > 0.35:
-                self._breath_bubble_last = now
-                import random
-                cb = BubbleWidget()
-                cb.show_message("哈~", BubbleType.CHAT,
-                                QPoint(self.x() + self.width() // 2, self.y()))
-                cb.dismissed.connect(cb.deleteLater)
-                self._chat_bubbles.append(cb)
             dx = pt.x - cx
             dy = pt.y - cy
             d = max(abs(dx), abs(dy), 1)
             push_x = pt.x + int(dx / d * 400)
             push_y = pt.y + int(dy / d * 400)
             ctypes.windll.user32.SetCursorPos(push_x, push_y)
+
+        # Fire a single "哈~" only on the transition from near → away, so the
+        # bubble appears once as the cursor leaves (not continuously).
+        if was_near and not near:
+            cb = BubbleWidget()
+            cb.show_message("哈~", BubbleType.CHAT,
+                            QPoint(self.x() + self.width() // 2, self.y()))
+            cb.dismissed.connect(cb.deleteLater)
+            self._chat_bubbles.append(cb)
 
     # ==================================================================
     # Pomodoro
