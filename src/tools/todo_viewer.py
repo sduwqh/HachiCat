@@ -14,6 +14,74 @@ from src.memory.database import Database
 from src.utils.theme import Theme, button_style, chip_button_style, app_window_style, form_field_style
 from src.utils.icons import icon, icon_pixmap
 
+
+def _parse_due(due: str):
+    """Parse a due-date string into a datetime, or None if unrecognized.
+
+    Accepts common shapes the AI / user produce, e.g.:
+      2026-07-15, 2026-07-15 15:00, 2026/07/15, 2026-07-15 15:00:00
+    A date-only value is treated as end-of-day (23:59).
+    """
+    from datetime import datetime
+    s = (due or "").strip().replace("/", "-")
+    if not s:
+        return None
+    fmts = [
+        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H", "%Y-%m-%d",
+        "%m-%d %H:%M", "%m-%d",
+    ]
+    for fmt in fmts:
+        try:
+            dt = datetime.strptime(s, fmt)
+            # month-day only → assume current year
+            if "%Y" not in fmt:
+                dt = dt.replace(year=datetime.now().year)
+            # date-only → end of that day
+            if "%H" not in fmt:
+                dt = dt.replace(hour=23, minute=59)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def _due_remaining(due: str):
+    """Return (suffix_text, urgency) for a due date.
+
+    urgency ∈ {'overdue','urgent','soon','later', ''}. suffix_text is a short
+    human hint like '还剩 3 天' / '已逾期 2 小时' / '' (unparseable).
+    """
+    from datetime import datetime
+    dt = _parse_due(due)
+    if dt is None:
+        return "", ""
+    delta = dt - datetime.now()
+    secs = delta.total_seconds()
+    past = secs < 0
+    secs = abs(secs)
+    days = int(secs // 86400)
+    hours = int((secs % 86400) // 3600)
+    mins = int((secs % 3600) // 60)
+    if days >= 1:
+        amount = f"{days} 天"
+    elif hours >= 1:
+        amount = f"{hours} 小时"
+    else:
+        amount = f"{max(mins, 1)} 分钟"
+    if past:
+        return f"已逾期 {amount}", "overdue"
+    # urgency buckets by time left
+    total_hours = secs / 3600
+    if total_hours <= 24:
+        urgency = "urgent"
+    elif total_hours <= 72:
+        urgency = "soon"
+    else:
+        urgency = "later"
+    return f"还剩 {amount}", urgency
+
+
 CARD_STYLE = """
     QWidget#todoRow {
         background: #fefaf5;
@@ -292,10 +360,24 @@ class TodoViewer(QDialog):
 
         due = todo.get("due_date", "")
         if due:
-            badge = QLabel(f"⏰ {due}")
+            # Countdown is only meaningful for pending items.
+            suffix, urgency = ("", "") if done else _due_remaining(due)
+            text = f"⏰ {due}"
+            if suffix:
+                text += f" · {suffix}"
+            # Color by urgency: overdue/urgent = red, soon = amber, later = muted.
+            palette = {
+                "overdue": (Theme.danger, "rgba(255,240,240,0.84)", "rgba(194,102,102,0.22)"),
+                "urgent":  (Theme.danger, "rgba(255,240,240,0.84)", "rgba(194,102,102,0.22)"),
+                "soon":    (Theme.warning, "rgba(255,248,235,0.90)", "rgba(194,139,40,0.28)"),
+                "later":   (Theme.muted, "rgba(245,247,250,0.90)", "rgba(31,41,55,0.14)"),
+            }
+            fg, bg, bd = palette.get(urgency,
+                                     (Theme.danger, "rgba(255,240,240,0.84)", "rgba(194,102,102,0.22)"))
+            badge = QLabel(text)
             badge.setStyleSheet(
-                f"color: {Theme.danger}; font-size: 10px; background: rgba(255,240,240,0.84); "
-                "border: 1px solid rgba(194,102,102,0.22); border-radius: 999px; padding: 2px 7px;"
+                f"color: {fg}; font-size: 10px; background: {bg}; "
+                f"border: 1px solid {bd}; border-radius: 999px; padding: 2px 7px;"
             )
             main_layout.addWidget(badge)
 

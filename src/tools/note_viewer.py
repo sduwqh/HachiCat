@@ -12,7 +12,6 @@ from PySide6.QtGui import QFont, QPixmap, QPalette, QBrush
 
 from src.memory.database import Database
 from src.utils.theme import Theme, chip_button_style
-from src.utils.markdown import md_to_html
 from src.utils.icons import icon, icon_pixmap
 
 
@@ -300,17 +299,17 @@ class NoteViewer(QDialog):
         preview.setFrameShape(QTextBrowser.NoFrame)
         preview.setStyleSheet(f"background: rgba(255,255,255,0.88); border: 1px solid {Theme.border}; border-radius: 10px; color: {Theme.text}; font-size: 12px; padding: 6px;")
         preview.document().setDocumentMargin(4)
-        preview.document().setDefaultStyleSheet(
-            "ul, ol { margin: 1px 0; padding-left: 16px; }"
-            "li { margin: 0; padding: 0; line-height: 1.35; }"
-        )
-        preview.setHtml(f"<div style='line-height:1.4;'>{md_to_html(note.get('content', ''))}</div>")
+        # Use Qt's built-in Markdown engine (headings, lists, code blocks,
+        # quotes, tables, links, inline code) instead of the tiny custom
+        # converter, which only handled bold/italic/lists.
+        preview.setMarkdown(note.get("content", ""))
         preview.hide()
         dl.addWidget(preview)
 
         def toggle_md(checked):
             if checked:
-                preview.setHtml(f"<div style='line-height:1.4;'>{md_to_html(content_edit.toPlainText())}</div>")
+                # Re-render from the (possibly edited) source each time.
+                preview.setMarkdown(content_edit.toPlainText())
                 content_edit.hide()
                 preview.show()
                 md_toggle.setText(" 显示原文")
