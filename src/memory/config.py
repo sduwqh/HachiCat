@@ -84,7 +84,7 @@ class ReminderConfig(BaseModel):
 
 class PrivacyConfig(BaseModel):
     """Privacy-sensitive settings."""
-    clipboard_monitor: bool = False
+    clipboard_monitor: bool = True   # 记录剪贴板历史，默认开启，用户可在设置关闭
     history_retention_days: int = Field(default=30, ge=1)
     telemetry: bool = False
 

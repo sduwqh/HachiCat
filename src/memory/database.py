@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS kv_store (
     value      TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+-- Clipboard history (Win+V style). Text stored inline; images saved as
+-- files under data/clipboard/ with the path kept in `content`.
+CREATE TABLE IF NOT EXISTS clipboard_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL DEFAULT 'text',   -- 'text' | 'image'
+    content     TEXT NOT NULL,                  -- text, or saved image file path
+    preview     TEXT DEFAULT '',                -- short preview label
+    source_path TEXT DEFAULT '',                -- original source path/URL (for images)
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
 """
 
 
@@ -101,6 +112,17 @@ class Database:
         """Create all tables if they don't exist."""
         self.conn.executescript(CREATE_TABLES_SQL)
         self.conn.commit()
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Lightweight in-place migrations for older databases."""
+        with self._lock:
+            cols = {r["name"] for r in self.conn.execute(
+                "PRAGMA table_info(clipboard_history)").fetchall()}
+            if "source_path" not in cols:
+                self.conn.execute(
+                    "ALTER TABLE clipboard_history ADD COLUMN source_path TEXT DEFAULT ''")
+                self.conn.commit()
 
     def execute(self, sql: str, params: tuple | dict | None = None) -> sqlite3.Cursor:
         """Execute a SQL statement."""

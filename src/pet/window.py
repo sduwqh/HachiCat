@@ -357,6 +357,8 @@ class PetWindow(QWidget):
         view_note_action.triggered.connect(lambda: self.agent_triggered.emit("view_notes"))
         gallery_action = menu.addAction(icon("gallery", _c, 16), "  查看图库")
         gallery_action.triggered.connect(lambda: self.agent_triggered.emit("view_gallery"))
+        clip_action = menu.addAction(icon("clipboard", _c, 16), "  最近复制")
+        clip_action.triggered.connect(lambda: self.agent_triggered.emit("view_clipboard"))
         # Pomodoro submenu
         pomo_menu = QMenu("  番茄钟", menu)
         pomo_menu.setIcon(icon("pomodoro", _c, 16))

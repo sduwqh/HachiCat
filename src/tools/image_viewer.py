@@ -125,6 +125,9 @@ class ImageViewer(QDialog):
             self.close()
 
 
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff", ".ico"}
+
+
 def get_clipboard_image() -> QPixmap | None:
     cb = QApplication.clipboard()
     pix = cb.pixmap()
@@ -133,4 +136,15 @@ def get_clipboard_image() -> QPixmap | None:
     img = cb.image()
     if img and not img.isNull():
         return QPixmap.fromImage(img)
+    # Copying an image *file* (Explorer / OneDrive) puts a file:/// URL on the
+    # clipboard, not pixel data. Load the file if it looks like an image.
+    mime = cb.mimeData()
+    if mime is not None and mime.hasUrls():
+        for url in mime.urls():
+            if url.isLocalFile():
+                p = url.toLocalFile()
+                if Path(p).suffix.lower() in _IMAGE_EXTS:
+                    loaded = QPixmap(p)
+                    if not loaded.isNull():
+                        return loaded
     return None

@@ -249,6 +249,12 @@ class SettingsDialog(QDialog):
         self._snap_taskbar_check = QCheckBox("任务栏吸附")
         pet_form.addRow("", self._snap_taskbar_check)
 
+        self._clipboard_history_check = QCheckBox("记录剪贴板历史（最近复制）")
+        self._clipboard_history_check.setToolTip(
+            "开启后自动记录复制的文字/图片，可在右键菜单「最近复制」查看。\n"
+            "注意：会记录你复制的一切（含密码等），仅保存在本地。")
+        pet_form.addRow("", self._clipboard_history_check)
+
         self._search_engine_combo = QComboBox()
         self._search_engine_combo.addItems(["bing", "google", "baidu", "duckduckgo"])
         pet_form.addRow("搜索引擎:", self._search_engine_combo)
@@ -346,9 +352,10 @@ class SettingsDialog(QDialog):
         for i, skin in enumerate(self._skins):
             card = QWidget()
             card.setFixedSize(120, 170)
+            card.setObjectName("skinCard")
             card.setStyleSheet("""
-                QWidget { background: rgba(255,255,255,0.88); border: 1px solid rgba(31,41,55,0.10); border-radius: 10px; }
-                QWidget:hover { background: rgba(255,122,89,0.08); border-color: rgba(255,122,89,0.34); }
+                QWidget#skinCard { background: #fff3e9; border: 1px solid rgba(180,140,100,0.28); border-radius: 10px; }
+                QWidget#skinCard:hover { background: #fff8f2; border-color: rgba(255,122,89,0.45); }
             """)
             card.setCursor(QCursor(Qt.PointingHandCursor))
             vl = QVBoxLayout(card)
@@ -362,7 +369,7 @@ class SettingsDialog(QDialog):
             thumb = QLabel()
             thumb.setAlignment(Qt.AlignCenter)
             thumb.setFixedSize(96, 96)
-            thumb.setStyleSheet("background: transparent; border: 1px solid rgba(31,41,55,0.10); border-radius: 4px;")
+            thumb.setStyleSheet("background: rgba(255,255,255,0.94); border: 1px solid rgba(180,140,100,0.16); border-radius: 8px;")
             if sprite and sprite.exists():
                 img = QImage(str(sprite))
                 if not img.isNull():
@@ -446,7 +453,7 @@ class SettingsDialog(QDialog):
         add_btn.setCursor(QCursor(Qt.PointingHandCursor))
         add_btn.setStyleSheet("""
             QLabel { color: #ff7a59; background: rgba(255,122,89,0.08);
-                     border: 1px dashed rgba(255,122,89,0.30); border-radius: 8px;
+                     border: 1px solid rgba(255,122,89,0.45); border-radius: 8px;
                      font-size: 12px; padding: 6px; }
             QLabel:hover { background: rgba(255,122,89,0.16); border-color: #ff7a59; }
         """)
@@ -480,8 +487,16 @@ class SettingsDialog(QDialog):
         title.setStyleSheet("color: #ffffff;")
         layout.addWidget(title)
 
-        # Intro text
-        intro = QLabel("本软件已支持 Petdex 形象库！\n前往 petdex.dev 挑选你喜欢的桌宠吧 👇")
+        # Intro text — petdex.dev is a clickable link that opens the browser.
+        intro = QLabel(
+            '本软件已支持 Petdex 形象库！<br>'
+            '前往 <a href="https://petdex.dev" '
+            'style="color:#ff9eb5; font-weight:bold; text-decoration:none;">petdex.dev</a> '
+            '挑选你喜欢的桌宠吧 👇'
+        )
+        intro.setTextFormat(Qt.RichText)
+        intro.setOpenExternalLinks(True)
+        intro.setTextInteractionFlags(Qt.TextBrowserInteraction)
         intro.setWordWrap(True)
         intro.setStyleSheet("color: #cccccc; font-size: 12px;")
         layout.addWidget(intro)
@@ -632,9 +647,10 @@ class SettingsDialog(QDialog):
         for i, skin in enumerate(self._skins):
             card = QWidget()
             card.setFixedSize(120, 170)
+            card.setObjectName("skinCard")
             card.setStyleSheet("""
-                QWidget { background: rgba(255,255,255,0.88); border: 1px solid rgba(31,41,55,0.10); border-radius: 10px; }
-                QWidget:hover { background: rgba(255,122,89,0.08); border-color: rgba(255,122,89,0.34); }
+                QWidget#skinCard { background: #fff3e9; border: 1px solid rgba(180,140,100,0.28); border-radius: 10px; }
+                QWidget#skinCard:hover { background: #fff8f2; border-color: rgba(255,122,89,0.45); }
             """)
             card.setCursor(QCursor(Qt.PointingHandCursor))
             vl = QVBoxLayout(card)
@@ -647,7 +663,7 @@ class SettingsDialog(QDialog):
             thumb = QLabel()
             thumb.setAlignment(Qt.AlignCenter)
             thumb.setFixedSize(96, 96)
-            thumb.setStyleSheet("background: transparent; border: 1px solid rgba(31,41,55,0.10); border-radius: 4px;")
+            thumb.setStyleSheet("background: rgba(255,255,255,0.94); border: 1px solid rgba(180,140,100,0.16); border-radius: 8px;")
             if sprite and sprite.exists():
                 img = QImage(str(sprite))
                 if not img.isNull():
@@ -894,6 +910,7 @@ class SettingsDialog(QDialog):
         is_hachi = (s.pet.skin == "HaChiCat")
         self._breath_mode_check.setVisible(is_hachi)
         self._snap_taskbar_check.setChecked(s.pet.snap_to_taskbar)
+        self._clipboard_history_check.setChecked(s.privacy.clipboard_monitor)
         if self._pet_window:
             self._breath_mode_check.setChecked(self._pet_window._breath_mode)
 
@@ -921,6 +938,7 @@ class SettingsDialog(QDialog):
         s.pet.search_engine = self._search_engine_combo.currentText()
         s.pet.skin = getattr(self, '_current_skin', 'HaChiCat')
         s.pet.snap_to_taskbar = self._snap_taskbar_check.isChecked()
+        s.privacy.clipboard_monitor = self._clipboard_history_check.isChecked()
         # Save per-skin size
         if self._pet_window and hasattr(self._pet_window, '_skin_sizes'):
             skin = getattr(self, '_current_skin', 'HaChiCat')

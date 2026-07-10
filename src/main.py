@@ -30,6 +30,7 @@ from src.tools.note_viewer import NoteViewer
 from src.tools.music_panel import MusicPanel
 from src.tools.image_viewer import ImageViewer, get_clipboard_image
 from src.tools.gallery import GalleryBrowser
+from src.tools.clipboard_viewer import ClipboardViewer
 from src.agent.reminder import ReminderEngine
 
 
@@ -201,6 +202,9 @@ class AgentPipeline(QObject):
         if action == "view_notes":
             self._open_note_viewer()
             return
+        if action == "view_clipboard":
+            self._open_clipboard_viewer()
+            return
         if action in ("add_todo", "general") and not input_text:
             self.input_requested.emit("add_todo")
             return
@@ -250,6 +254,10 @@ class AgentPipeline(QObject):
             bg = cfg.settings.pet.note_bg if cfg else ""
             self._show_non_modal(
                 NoteViewer(self._db, bg_path=bg, on_bg_changed=save_bg), "_note_viewer")
+
+    def _open_clipboard_viewer(self) -> None:
+        if self._db:
+            self._show_non_modal(ClipboardViewer(self._db), "_clipboard_viewer")
 
     def _show_non_modal(self, dialog, attr: str) -> None:
         """Show non-modal, reuse if already open, keep above pet."""
@@ -484,6 +492,25 @@ def main() -> int:
 
     settings_dialog_ref = [None]  # mutable ref for closure
 
+    # ---- Clipboard history monitor (Win+V style) ----
+    # Records copied text/images into clipboard_history. Privacy-sensitive,
+    # so gated behind privacy.clipboard_monitor (default off). Created lazily
+    # and started/stopped live from the settings toggle.
+    clipboard_monitor = None
+
+    def _sync_clipboard_monitor():
+        """Start or stop the clipboard monitor to match the current setting."""
+        nonlocal clipboard_monitor
+        want = config.settings.privacy.clipboard_monitor
+        if want and clipboard_monitor is None:
+            from src.input.clipboard_monitor import ClipboardMonitor
+            clipboard_monitor = ClipboardMonitor(db, get_data_dir() / "clipboard")
+            logger.info("Clipboard history monitor started")
+        elif not want and clipboard_monitor is not None:
+            clipboard_monitor.stop()
+            clipboard_monitor = None
+            logger.info("Clipboard history monitor stopped")
+
     def apply_settings_live():
         """Re-read config and apply all changes immediately — no restart needed."""
         config.load()
@@ -492,6 +519,7 @@ def main() -> int:
         # (breath mode handled live via toggle, not from config)
         pet_window.set_snap_taskbar(s.pet.snap_to_taskbar)
         pet_window.set_skin_sizes(s.pet.skin_sizes)
+        _sync_clipboard_monitor()
         # Only reload the skin when it actually changed. switch_skin re-runs
         # setGeometry (repositioning the pet) and the startup greeting, so
         # calling it on every save — e.g. after just toggling breath mode —
@@ -629,6 +657,9 @@ def main() -> int:
     # Ctrl+Shift+A: smart selection (image → show, text → popup menu)
     hotkey_manager.register(config.settings.hotkeys.general_agent, "smart_select")
 
+    # Start the clipboard monitor now if the setting is already on.
+    _sync_clipboard_monitor()
+
     def grab_selected_text() -> str:
         """Try to copy selected text to clipboard, then read it back.
 
@@ -642,15 +673,23 @@ def main() -> int:
             import time
             import ctypes
 
-            # Don't touch clipboard if it currently holds an image
+            # Don't touch clipboard if it currently holds an image — either a
+            # bitmap (screenshot) OR an image file URL (copied from Explorer/
+            # OneDrive). get_clipboard_image() detects both; if it finds one,
+            # let on_hotkey's image branch handle it instead of reading text.
             try:
-                if not QApplication.clipboard().image().isNull():
+                if get_clipboard_image() is not None:
                     return ""
             except Exception:
                 pass
 
             clipboard = QApplication.clipboard()
             old = clipboard.text()
+
+            # Pause history capture: the Ctrl+C probe + restore below would
+            # otherwise pollute the clipboard history with transient values.
+            if clipboard_monitor:
+                clipboard_monitor.pause()
 
             user32 = ctypes.windll.user32
 
@@ -672,10 +711,15 @@ def main() -> int:
             new = clipboard.text()
             clipboard.setText(old)  # restore
 
+            if clipboard_monitor:
+                clipboard_monitor.resume()
+
             if new and new != old:
                 return new
             return ""
         except Exception:
+            if clipboard_monitor:
+                clipboard_monitor.resume()
             return ""
 
     # ---- Popup Menu ----

@@ -98,19 +98,32 @@ class GalleryBrowser(QDialog):
         thumb = pix.scaled(THUMB, THUMB, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
         card = QWidget()
+        card.setObjectName("galleryCard")
         card.setFixedSize(THUMB + 16, THUMB + 44)
+        # Warmer card surface so the card reads as a distinct layer above the
+        # panel, plus a hover lift.
         card.setStyleSheet(
-            f"background: #fefaf5; border: 1px solid rgba(180,140,100,0.20); border-radius: 16px;"
+            "QWidget#galleryCard {"
+            " background: #fff3e9; border: 1px solid rgba(180,140,100,0.28);"
+            " border-radius: 16px; }"
+            " QWidget#galleryCard:hover {"
+            " background: #fff8f2; border-color: rgba(255,122,89,0.45); }"
         )
 
         vl = QVBoxLayout(card)
         vl.setContentsMargins(8, 6, 8, 4)
         vl.setSpacing(4)
 
+        # Inset panel behind the thumbnail gives the image its own surface so
+        # it doesn't blend into the card (adds depth instead of a bare line).
         img = QLabel()
         img.setPixmap(thumb)
         img.setAlignment(Qt.AlignCenter)
-        img.setStyleSheet("background: transparent;")
+        img.setFixedHeight(THUMB)
+        img.setStyleSheet(
+            "background: rgba(255,255,255,0.94);"
+            " border: 1px solid rgba(180,140,100,0.14); border-radius: 10px;"
+        )
         vl.addWidget(img)
 
         bar = QHBoxLayout()
@@ -187,6 +200,8 @@ class GalleryBrowser(QDialog):
         import shiboken6
         QApplication.clipboard().setPixmap(QPixmap(str(path)))
         btn.setPixmap(icon_pixmap("check", Theme.success, 15))
+        from src.utils.toast import show_toast
+        show_toast(self, "已复制")
 
         def _restore(b=btn):
             if shiboken6.isValid(b):

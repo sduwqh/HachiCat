@@ -256,6 +256,17 @@ class NoteViewer(QDialog):
             f"QPushButton:checked {{ color: {Theme.accent}; background: rgba(255,122,89,0.10); border-color: rgba(255,122,89,0.30); }}"
         )
         bar_row.addWidget(md_toggle)
+
+        copy_btn = QPushButton(" 复制内容")
+        copy_btn.setIcon(icon("check", Theme.muted, 14))
+        copy_font = QF()
+        copy_font.setPointSize(9)
+        copy_btn.setFont(copy_font)
+        copy_btn.setStyleSheet(
+            f"QPushButton {{ color: {Theme.muted}; background: rgba(255,255,255,0.72); border: 1px solid {Theme.border}; border-radius: 7px; padding: 3px 10px; font-size: 10px; }}"
+            f"QPushButton:hover {{ color: {Theme.success}; border-color: rgba(93,139,100,0.35); background: rgba(93,139,100,0.10); }}"
+        )
+        bar_row.addWidget(copy_btn)
         bar_row.addStretch()
 
         del_btn = QPushButton(" 删除此笔记")
@@ -276,6 +287,10 @@ class NoteViewer(QDialog):
         content_edit.setStyleSheet(f"background: rgba(255,255,255,0.88); border: 1px solid {Theme.border}; border-radius: 10px; color: {Theme.text}; font-size: 12px; padding: 6px;")
         content_edit.textChanged.connect(lambda nid=nid, ce=content_edit: self._mark_dirty(nid, ce))
         dl.addWidget(content_edit)
+
+        # Wire the copy button now that the editor exists.
+        copy_btn.clicked.connect(
+            lambda checked=False, ce=content_edit: self._on_copy_content(ce))
 
         # Rendered markdown preview
         from PySide6.QtWidgets import QTextBrowser
@@ -351,6 +366,12 @@ class NoteViewer(QDialog):
     def _on_delete(self, nid: int) -> None:
         self._db.update("DELETE FROM notes WHERE id=?", (nid,))
         self.refresh()
+
+    def _on_copy_content(self, editor) -> None:
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(editor.toPlainText())
+        from src.utils.toast import show_toast
+        show_toast(self, "已复制")
 
     def _on_set_bg(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
