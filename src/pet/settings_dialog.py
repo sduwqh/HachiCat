@@ -951,7 +951,7 @@ class SettingsDialog(QDialog):
         s.reminder.later_interval = self._later_slider[0].findChild(QSlider).value()
         s.reminder.wellness_interval = self._wellness_slider[0].findChild(QSlider).value()
 
-        s.hotkeys.general_agent = self._hotkey_edit.text().strip() or "ctrl+shift+a"
+        s.hotkeys.general_agent = self._hotkey_edit.text().strip() or "ctrl+shift+z"
 
         self._config.save(s)
         if self._on_apply_live:

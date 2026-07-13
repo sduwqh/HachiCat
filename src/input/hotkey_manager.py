@@ -148,12 +148,16 @@ class GlobalHotkeyManager(QObject):
             logger.warning("No valid hotkeys to register")
             return
 
-        # Start pump thread — it will register hotkeys and enter message loop
-        self._stop_event.clear()
+        # Start pump thread — it will register hotkeys and enter message loop.
+        # Give this thread its OWN stop event so a later start() can never
+        # "revive" a previous thread by clearing a shared event (that bug left
+        # a zombie thread holding the old hotkey, so re-registering it failed).
+        self._stop_event = threading.Event()
+        stop_event = self._stop_event
         self._ready_event = threading.Event()
         self._thread = threading.Thread(
             target=self._message_pump,
-            args=(pending_list,),
+            args=(pending_list, stop_event),
             name="hotkey-pump",
             daemon=True,
         )
@@ -166,16 +170,21 @@ class GlobalHotkeyManager(QObject):
         else:
             logger.error("Hotkey pump thread did not start in time")
 
-    def _message_pump(self, pending_hotkeys: list[tuple[int, int, str]]) -> None:
+    def _message_pump(self, pending_hotkeys: list[tuple[int, int, str]],
+                      stop_event: threading.Event) -> None:
         """Windows message pump — runs in dedicated thread.
 
         1. Register all hotkeys with RegisterHotKey(NULL, ...)
            → WM_HOTKEY messages will arrive in THIS thread's queue
         2. Enter PeekMessage loop to receive them
+
+        Uses a thread-local id map so cleanup on exit only touches the hotkeys
+        THIS thread registered — no cross-thread dict races.
         """
         self._thread_id = kernel32.GetCurrentThreadId()
 
-        # Step 1: Register hotkeys IN THIS THREAD
+        # Step 1: Register hotkeys IN THIS THREAD (thread-local id map)
+        local_ids: dict[int, str] = {}
         success = 0
         for mods, vk, action in pending_hotkeys:
             hid = self._next_id
@@ -183,7 +192,7 @@ class GlobalHotkeyManager(QObject):
 
             result = user32.RegisterHotKey(None, hid, mods, vk)
             if result:
-                self._hotkey_ids[hid] = action
+                local_ids[hid] = action
                 success += 1
                 logger.info("Registered hotkey %s (id=%d)", action, hid)
             else:
@@ -193,6 +202,9 @@ class GlobalHotkeyManager(QObject):
                 else:
                     logger.warning("Failed to register '%s' (error %d)", action, err)
 
+        # Expose for the message loop dispatch
+        self._hotkey_ids = local_ids
+
         logger.info("Hotkey registration: %d/%d succeeded", success, len(pending_hotkeys))
         self._ready_event.set()
 
@@ -200,10 +212,10 @@ class GlobalHotkeyManager(QObject):
             self._thread_id = None
             return  # Nothing to pump
 
-        # Step 2: Message pump loop
+        # Step 2: Message pump loop — obey THIS thread's own stop event
         msg = MSG()
 
-        while not self._stop_event.is_set():
+        while not stop_event.is_set():
             has_msg = user32.PeekMessageW(
                 ctypes.byref(msg), None, 0, 0,
                 1  # PM_REMOVE
@@ -211,7 +223,7 @@ class GlobalHotkeyManager(QObject):
 
             if has_msg:
                 if msg.message == WM_HOTKEY:
-                    action = self._hotkey_ids.get(msg.wParam)
+                    action = local_ids.get(msg.wParam)
                     if action:
                         logger.info("Hotkey: %s", action)
                         self.hotkey_triggered.emit(action)
@@ -221,9 +233,9 @@ class GlobalHotkeyManager(QObject):
             else:
                 time.sleep(0.005)  # Prevent busy-wait
 
-        for hid in list(self._hotkey_ids.keys()):
+        # Unregister only the hotkeys this thread owns.
+        for hid in list(local_ids.keys()):
             user32.UnregisterHotKey(None, hid)
-        self._hotkey_ids.clear()
         self._thread_id = None
 
     def stop(self) -> None:
@@ -240,6 +252,17 @@ class GlobalHotkeyManager(QObject):
         self._thread_id = None
 
         logger.info("Hotkeys stopped")
+
+    def reconfigure(self, hotkey_str: str, action_name: str) -> None:
+        """Atomically switch to a new single hotkey: stop, clear, register, start.
+
+        Safe to call repeatedly (e.g. from the settings dialog). Because each
+        pump thread owns its own stop event and unregisters its own hotkeys on
+        exit, switching back to a previously-used key works reliably.
+        """
+        self.stop()
+        self._pending = {hotkey_str: action_name}
+        self.start()
 
     def is_running(self) -> bool:
         return self._running

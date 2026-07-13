@@ -39,7 +39,7 @@ class HotkeyConfig(BaseModel):
     open_website: str = "ctrl+shift+w"
     quick_search: str = "ctrl+shift+s"
     quick_reminder: str = "ctrl+shift+r"
-    general_agent: str = "ctrl+shift+a"
+    general_agent: str = "ctrl+shift+z"
     toggle_pet: str = "ctrl+shift+p"
 
 

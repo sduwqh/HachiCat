@@ -542,13 +542,10 @@ def main() -> int:
         classifier.set_llm_client(llm_client)
         # Reminder
         reminder.set_enabled(s.reminder.enabled)
-        # Hotkey — re-register with new key
-        hotkey_manager.stop()
-        hotkey_manager._pending.clear()
-        hotkey_manager._hotkey_ids.clear()
-        hotkey_manager._next_id = 1
-        hotkey_manager.register(s.hotkeys.general_agent, "smart_select")
-        hotkey_manager.start()
+        # Hotkey — atomically re-register with the new key. reconfigure()
+        # handles stop→clear→register→start safely, so switching back to a
+        # previously-used key (e.g. ctrl+shift+z) works.
+        hotkey_manager.reconfigure(s.hotkeys.general_agent, "smart_select")
         logger.info("Settings applied live. LLM=%s", "enabled" if llm_client else "disabled")
 
     def on_settings():
