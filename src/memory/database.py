@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS clipboard_history (
     content     TEXT NOT NULL,                  -- text, or saved image file path
     preview     TEXT DEFAULT '',                -- short preview label
     source_path TEXT DEFAULT '',                -- original source path/URL (for images)
+    category    TEXT DEFAULT 'text',            -- image|link|email|code|text
     created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 """
@@ -122,6 +123,10 @@ class Database:
             if "source_path" not in cols:
                 self.conn.execute(
                     "ALTER TABLE clipboard_history ADD COLUMN source_path TEXT DEFAULT ''")
+                self.conn.commit()
+            if "category" not in cols:
+                self.conn.execute(
+                    "ALTER TABLE clipboard_history ADD COLUMN category TEXT DEFAULT 'text'")
                 self.conn.commit()
 
     def execute(self, sql: str, params: tuple | dict | None = None) -> sqlite3.Cursor:

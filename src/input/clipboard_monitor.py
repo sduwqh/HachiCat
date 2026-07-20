@@ -11,6 +11,7 @@ settings.privacy.clipboard_monitor (default off).
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer
@@ -21,6 +22,40 @@ MAX_ENTRIES = 50            # keep only the most recent N items
 _MAX_PREVIEW = 80           # preview label length for text
 _DEBOUNCE_MS = 150          # coalesce rapid dataChanged bursts into one capture
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff", ".ico"}
+
+# --- text classification ---------------------------------------------------
+_RE_URL = re.compile(r"^(https?://|www\.)\S+$", re.IGNORECASE)
+_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Common code signals: braces/semicolons, indentation, or keywords
+_CODE_KEYWORDS = (
+    "def ", "class ", "import ", "function ", "const ", "let ", "var ",
+    "public ", "private ", "return ", "#include", "print(", "console.log",
+    "</", "/>", "<div", "<span", "<a ", "<p>", "SELECT ", "select ", "=>", "::",
+)
+
+
+def classify_text(text: str) -> str:
+    """Best-effort category for a copied text snippet.
+
+    Returns one of: 'link' | 'email' | 'code' | 'text'.
+    Single-line checks (url/email) win first; then code heuristics.
+    """
+    s = (text or "").strip()
+    if not s:
+        return "text"
+    single = "\n" not in s
+    if single and _RE_URL.match(s):
+        return "link"
+    if single and _RE_EMAIL.match(s):
+        return "email"
+    # Code: multi-line with braces/semicolons/indent, or a known keyword.
+    lowered = s
+    has_kw = any(k in lowered for k in _CODE_KEYWORDS)
+    struct = ("{" in s and "}" in s) or s.count(";") >= 2
+    indented = any(ln.startswith(("    ", "\t")) for ln in s.split("\n"))
+    if has_kw or (("\n" in s) and (struct or indented)):
+        return "code"
+    return "text"
 
 
 class ClipboardMonitor(QObject):
@@ -120,10 +155,11 @@ class ClipboardMonitor(QObject):
 
     def _record_text(self, text: str) -> None:
         preview = " ".join(text.split())[:_MAX_PREVIEW]
+        category = classify_text(text)
         self._db.insert(
-            "INSERT INTO clipboard_history (kind, content, preview) "
-            "VALUES ('text', ?, ?)",
-            (text, preview),
+            "INSERT INTO clipboard_history (kind, content, preview, category) "
+            "VALUES ('text', ?, ?, ?)",
+            (text, preview, category),
         )
         self._trim()
 
@@ -143,8 +179,8 @@ class ClipboardMonitor(QObject):
         if source_path:
             preview = f"图片 · {Path(source_path).name}"
         self._db.insert(
-            "INSERT INTO clipboard_history (kind, content, preview, source_path) "
-            "VALUES ('image', ?, ?, ?)",
+            "INSERT INTO clipboard_history (kind, content, preview, source_path, category) "
+            "VALUES ('image', ?, ?, ?, 'image')",
             (str(path), preview, source_path),
         )
         self._trim()

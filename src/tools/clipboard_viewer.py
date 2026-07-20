@@ -33,6 +33,8 @@ class ClipboardViewer(QDialog):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self._db = db
+        self._filter = "all"       # all|image|link|text|email|code|path
+        self._tab_btns = {}
         self.setWindowTitle("最近复制")
         self.setMinimumSize(420, 420)
         self.setWindowFlags(Qt.Tool)
@@ -79,6 +81,20 @@ class ClipboardViewer(QDialog):
         header.addWidget(clear_btn)
         layout.addLayout(header)
 
+        # Category filter tabs. Primary tabs (全部/图片/链接/文字) are normal
+        # size; secondary ones (邮箱/代码/路径) are smaller per request.
+        tabs = QHBoxLayout()
+        tabs.setContentsMargins(0, 0, 0, 0)
+        tabs.setSpacing(6)
+        primary = [("all", "全部"), ("image", "图片"), ("link", "链接"), ("text", "文字")]
+        secondary = [("email", "邮箱"), ("code", "代码")]
+        for key, label in primary:
+            tabs.addWidget(self._make_tab(key, label, small=False))
+        for key, label in secondary:
+            tabs.addWidget(self._make_tab(key, label, small=True))
+        tabs.addStretch()
+        layout.addLayout(tabs)
+
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -102,6 +118,42 @@ class ClipboardViewer(QDialog):
         hint.setStyleSheet(f"color: {Theme.muted}; font-size: 10px; background: transparent;")
         layout.addWidget(hint)
 
+    def _make_tab(self, key: str, label: str, small: bool) -> QPushButton:
+        btn = QPushButton(label)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setCheckable(True)
+        btn.setChecked(key == self._filter)
+        btn._small = small
+        btn.clicked.connect(lambda checked=False, k=key: self._set_filter(k))
+        self._tab_btns[key] = btn
+        self._style_tab(btn, key == self._filter)
+        return btn
+
+    def _style_tab(self, btn, selected: bool) -> None:
+        pad = "2px 8px" if btn._small else "4px 12px"
+        fs = "10px" if btn._small else "12px"
+        if selected:
+            btn.setStyleSheet(
+                f"QPushButton {{ color: #ffffff; background: {Theme.accent};"
+                f" border: 1px solid {Theme.accent}; border-radius: 999px;"
+                f" padding: {pad}; font-size: {fs}; }}"
+            )
+        else:
+            btn.setStyleSheet(
+                f"QPushButton {{ color: {Theme.muted}; background: rgba(255,255,255,0.72);"
+                f" border: 1px solid {Theme.border}; border-radius: 999px;"
+                f" padding: {pad}; font-size: {fs}; }}"
+                f"QPushButton:hover {{ color: {Theme.accent};"
+                f" border-color: rgba(255,122,89,0.40); background: rgba(255,122,89,0.10); }}"
+            )
+
+    def _set_filter(self, key: str) -> None:
+        self._filter = key
+        for k, b in self._tab_btns.items():
+            b.setChecked(k == key)
+            self._style_tab(b, k == key)
+        self.refresh()
+
     def refresh(self) -> None:
         while self._list_layout.count() > 1:
             item = self._list_layout.takeAt(0)
@@ -112,8 +164,17 @@ class ClipboardViewer(QDialog):
         rows = self._db.fetch_all(
             "SELECT * FROM clipboard_history ORDER BY id DESC LIMIT 50"
         )
+        # Resolve each row's category (fall back to on-the-fly classification
+        # for legacy rows stored before the category column existed).
+        for r in rows:
+            r["_cat"] = self._category_of(r)
+        if self._filter != "all":
+            rows = [r for r in rows if r["_cat"] == self._filter]
+
         if not rows:
-            empty = QLabel("  暂无剪贴板历史 📋\n  复制文字或图片后会自动出现在这里")
+            msg = ("  暂无剪贴板历史 📋\n  复制文字或图片后会自动出现在这里"
+                   if self._filter == "all" else "  该分类下暂无内容")
+            empty = QLabel(msg)
             empty.setStyleSheet(
                 f"color: {Theme.muted}; padding: 30px; font-size: 12px; background: transparent;")
             self._list_layout.insertWidget(0, empty)
@@ -122,6 +183,37 @@ class ClipboardViewer(QDialog):
         for row in rows:
             self._list_layout.insertWidget(
                 self._list_layout.count() - 1, self._make_row(row))
+
+    @staticmethod
+    def _category_of(entry: dict) -> str:
+        """Category for a row: stored value, or classify text on the fly."""
+        if entry.get("kind") == "image":
+            return "image"
+        cat = entry.get("category")
+        if cat and cat != "text":
+            return cat
+        # legacy/text rows: classify now so filters still work
+        from src.input.clipboard_monitor import classify_text
+        return classify_text(entry.get("content", ""))
+
+    @staticmethod
+    def _category_chip(cat: str):
+        """Small colored tag for a text row's category, or None for plain text."""
+        meta = {
+            "link":  ("链接", "#4A90D9"),
+            "email": ("邮箱", "#8E6FBF"),
+            "code":  ("代码", "#5B9E5B"),
+        }
+        if cat not in meta:
+            return None
+        text, color = meta[cat]
+        chip = QLabel(text)
+        chip.setStyleSheet(
+            f"color: {color}; font-size: 9px; background: {color}1a;"
+            f" border: 1px solid {color}44; border-radius: 6px; padding: 1px 5px;"
+        )
+        chip.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        return chip
 
     def _make_row(self, entry: dict) -> QWidget:
         row = QWidget()
@@ -162,6 +254,10 @@ class ClipboardViewer(QDialog):
             label = QLabel("🖼 图片")
             label.setStyleSheet(f"color: {Theme.text}; font-size: 12px; background: transparent;")
         else:
+            cat = entry.get("_cat") or self._category_of(entry)
+            chip = self._category_chip(cat)
+            if chip is not None:
+                hl.addWidget(chip)
             label = QLabel(entry.get("preview") or entry.get("content", "")[:80])
             label.setWordWrap(True)
             label.setStyleSheet(f"color: {Theme.text}; font-size: 12px; background: transparent;")
