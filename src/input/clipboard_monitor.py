@@ -77,10 +77,29 @@ class ClipboardMonitor(QObject):
         self._timer.setInterval(_DEBOUNCE_MS)
         self._timer.timeout.connect(self._capture)
         self._clip.dataChanged.connect(self._on_change)
+        self._connected = True
 
     # -- pause control (used while grab_selected_text mutates the clipboard) --
     def pause(self) -> None:
+        """Fully DISCONNECT from the clipboard during a grab.
+
+        A merely-flagged pause still leaves Qt's dataChanged listener active,
+        and a listening process can hold the Windows clipboard open long enough
+        that the target app's Ctrl+C (SetClipboardData) fails — which made
+        synthetic-copy text capture silently return nothing. Disconnecting
+        releases any clipboard hook for the duration of the grab.
+        """
         self._paused = True
+        try:
+            self._timer.stop()
+        except Exception:
+            pass
+        if self._connected:
+            try:
+                self._clip.dataChanged.disconnect(self._on_change)
+            except Exception:
+                pass
+            self._connected = False
 
     def resume(self) -> None:
         # Sync last_text so the restore write doesn't get logged as new.
@@ -89,6 +108,10 @@ class ClipboardMonitor(QObject):
         except Exception:
             pass
         self._paused = False
+        # Reconnect the listener (only if pause() actually disconnected it).
+        if not self._connected:
+            self._clip.dataChanged.connect(self._on_change)
+            self._connected = True
 
     def stop(self) -> None:
         """Disconnect from the clipboard so no further history is recorded."""
@@ -96,10 +119,12 @@ class ClipboardMonitor(QObject):
             self._timer.stop()
         except Exception:
             pass
-        try:
-            self._clip.dataChanged.disconnect(self._on_change)
-        except Exception:
-            pass
+        if self._connected:
+            try:
+                self._clip.dataChanged.disconnect(self._on_change)
+            except Exception:
+                pass
+            self._connected = False
 
     def _on_change(self) -> None:
         if self._paused:

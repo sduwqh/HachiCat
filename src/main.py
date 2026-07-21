@@ -695,7 +695,7 @@ def main() -> int:
             if focus:
                 user32.SendMessageW(focus, 0x0301, 0, 0)  # WM_COPY
 
-            # Method 2: keybd_event Ctrl+C
+            # Method 2: keybd_event Ctrl+C (original, known-good sequence)
             user32.keybd_event(0x11, 0, 0, 0)   # Ctrl down
             user32.keybd_event(0x43, 0, 0, 0)   # C down
             time.sleep(0.04)
@@ -780,10 +780,12 @@ def main() -> int:
             logger.info("Clipboard image %dx%d", pix.width(), pix.height())
             return
 
-        # 2b) Text on clipboard
+        # 2b) Text on clipboard. Read via Qt (grab_selected_text already put
+        # the current clipboard text back through Qt; using pyperclip here
+        # races with that write and often returns empty). Qt holds the value.
+        clip_text = ""
         try:
-            import pyperclip
-            clip_text = pyperclip.paste().strip()
+            clip_text = (QApplication.clipboard().text() or "").strip()
         except Exception:
             clip_text = ""
         if clip_text:
