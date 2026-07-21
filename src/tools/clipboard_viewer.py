@@ -9,7 +9,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QWidget, QSizePolicy, QApplication,
+    QPushButton, QScrollArea, QWidget, QSizePolicy, QApplication, QLineEdit,
 )
 from PySide6.QtGui import QFont, QPixmap, QCursor
 
@@ -33,7 +33,8 @@ class ClipboardViewer(QDialog):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self._db = db
-        self._filter = "all"       # all|image|link|text|email|code|path
+        self._filter = "all"       # all|image|link|text|email|code
+        self._search = ""          # keyword filter (case-insensitive)
         self._tab_btns = {}
         self.setWindowTitle("最近复制")
         self.setMinimumSize(420, 420)
@@ -80,6 +81,22 @@ class ClipboardViewer(QDialog):
         clear_btn.clicked.connect(self._on_clear_all)
         header.addWidget(clear_btn)
         layout.addLayout(header)
+
+        # Keyword search box — filters history by content as you type.
+        self._search_edit = QLineEdit()
+        self._search_edit.setPlaceholderText("搜索复制内容…")
+        self._search_edit.setClearButtonEnabled(True)
+        self._search_edit.addAction(icon("search", Theme.muted, 15),
+                                    QLineEdit.LeadingPosition)
+        self._search_edit.setStyleSheet(
+            f"QLineEdit {{ background: rgba(255,255,255,0.86); color: {Theme.text};"
+            f" border: 1px solid {Theme.border}; border-radius: 10px;"
+            f" padding: 6px 10px; font-size: 12px; }}"
+            f"QLineEdit:focus {{ border-color: rgba(255,122,89,0.55);"
+            f" background: #fffaf6; }}"
+        )
+        self._search_edit.textChanged.connect(self._on_search_changed)
+        layout.addWidget(self._search_edit)
 
         # Category filter tabs. Primary tabs (全部/图片/链接/文字) are normal
         # size; secondary ones (邮箱/代码/路径) are smaller per request.
@@ -130,18 +147,19 @@ class ClipboardViewer(QDialog):
         return btn
 
     def _style_tab(self, btn, selected: bool) -> None:
-        pad = "2px 8px" if btn._small else "4px 12px"
+        pad = "3px 10px" if btn._small else "5px 14px"
         fs = "10px" if btn._small else "12px"
+        radius = "7px" if btn._small else "8px"
         if selected:
             btn.setStyleSheet(
                 f"QPushButton {{ color: #ffffff; background: {Theme.accent};"
-                f" border: 1px solid {Theme.accent}; border-radius: 999px;"
+                f" border: 1px solid {Theme.accent}; border-radius: {radius};"
                 f" padding: {pad}; font-size: {fs}; }}"
             )
         else:
             btn.setStyleSheet(
                 f"QPushButton {{ color: {Theme.muted}; background: rgba(255,255,255,0.72);"
-                f" border: 1px solid {Theme.border}; border-radius: 999px;"
+                f" border: 1px solid {Theme.border}; border-radius: {radius};"
                 f" padding: {pad}; font-size: {fs}; }}"
                 f"QPushButton:hover {{ color: {Theme.accent};"
                 f" border-color: rgba(255,122,89,0.40); background: rgba(255,122,89,0.10); }}"
@@ -152,6 +170,10 @@ class ClipboardViewer(QDialog):
         for k, b in self._tab_btns.items():
             b.setChecked(k == key)
             self._style_tab(b, k == key)
+        self.refresh()
+
+    def _on_search_changed(self, text: str) -> None:
+        self._search = (text or "").strip().lower()
         self.refresh()
 
     def refresh(self) -> None:
@@ -170,10 +192,20 @@ class ClipboardViewer(QDialog):
             r["_cat"] = self._category_of(r)
         if self._filter != "all":
             rows = [r for r in rows if r["_cat"] == self._filter]
+        # Keyword search: match against text content, preview, and (image)
+        # source path — case-insensitive substring.
+        if self._search:
+            q = self._search
+            rows = [r for r in rows if q in (
+                (r.get("content", "") + " " + (r.get("preview", "") or "")
+                 + " " + (r.get("source_path", "") or "")).lower())]
 
         if not rows:
-            msg = ("  暂无剪贴板历史 📋\n  复制文字或图片后会自动出现在这里"
-                   if self._filter == "all" else "  该分类下暂无内容")
+            if self._search:
+                msg = "  没有匹配的内容 🔍"
+            else:
+                msg = ("  暂无剪贴板历史 📋\n  复制文字或图片后会自动出现在这里"
+                       if self._filter == "all" else "  该分类下暂无内容")
             empty = QLabel(msg)
             empty.setStyleSheet(
                 f"color: {Theme.muted}; padding: 30px; font-size: 12px; background: transparent;")
