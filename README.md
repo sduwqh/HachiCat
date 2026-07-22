@@ -84,7 +84,7 @@ AI总结主题，截止时间，并在截止时间前提醒用户
 
 ### 直接下载（推荐）
 
-前往 [Releases](https://github.com/sduwqh/HachiCat/releases) 下载最新版 `Hachicat_v1.3.zip`，解压后运行文件夹里的 `Hachicat_v1.3.exe` 即可，无需安装 Python。
+前往 [Releases](https://github.com/sduwqh/HachiCat/releases) 下载最新版 `Hachicat_v1.5.zip`，解压后运行文件夹里的 `Hachicat_v1.5.exe` 即可，无需安装 Python。
 
 > exe 依赖同目录的 `_internal` 文件夹，请保持文件夹结构完整，不要单独移动 exe。
 
