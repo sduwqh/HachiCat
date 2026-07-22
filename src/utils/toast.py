@@ -7,6 +7,7 @@ then deletes itself.
 
 from __future__ import annotations
 
+import shiboken6
 from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PySide6.QtWidgets import QLabel, QGraphicsOpacityEffect
 
@@ -18,10 +19,11 @@ def show_toast(parent, text: str = "已复制", msec: int = 1000) -> None:
     toast = QLabel(parent)
     toast.setText(f"✓  {text}")
     toast.setAlignment(Qt.AlignCenter)
+    # NOTE: the whole string is an f-string, so CSS braces must be doubled.
     toast.setStyleSheet(
         f"QLabel {{ background: {Theme.success}; color: #ffffff;"
-        " font-size: 12px; font-weight: 600; padding: 8px 18px;"
-        " border-radius: 14px; }}"
+        f" font-size: 12px; font-weight: 600; padding: 8px 18px;"
+        f" border-radius: 14px; }}"
     )
     toast.adjustSize()
     # Center over parent
@@ -37,6 +39,10 @@ def show_toast(parent, text: str = "已复制", msec: int = 1000) -> None:
     eff.setOpacity(1.0)
 
     def _fade():
+        # The parent panel (and thus toast + effect) may have been closed
+        # before this timer fires — guard against dead C++ objects.
+        if not shiboken6.isValid(toast) or not shiboken6.isValid(eff):
+            return
         anim = QPropertyAnimation(eff, b"opacity", toast)
         anim.setDuration(300)
         anim.setStartValue(1.0)

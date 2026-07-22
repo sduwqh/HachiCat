@@ -292,16 +292,16 @@ class SettingsDialog(QDialog):
         self._rem_enabled.setChecked(True)
         rem_form.addRow("", self._rem_enabled)
 
-        self._urgent_slider = self._make_slider(10, 120, 30, "分钟")
+        self._urgent_slider = self._make_slider(5, 120, 15, "分钟")
         rem_form.addRow("紧急任务 (<1天截止):", self._urgent_slider[0])
 
-        self._soon_slider = self._make_slider(30, 360, 90, "分钟")
+        self._soon_slider = self._make_slider(15, 360, 45, "分钟")
         rem_form.addRow("近期任务 (1-3天):", self._soon_slider[0])
 
-        self._later_slider = self._make_slider(60, 720, 240, "分钟")
+        self._later_slider = self._make_slider(30, 720, 120, "分钟")
         rem_form.addRow("远期任务 (3天+):", self._later_slider[0])
 
-        self._wellness_slider = self._make_slider(10, 120, 60, "分钟")
+        self._wellness_slider = self._make_slider(15, 120, 40, "分钟")
         rem_form.addRow("健康提醒:", self._wellness_slider[0])
 
         layout.addWidget(rem_group)

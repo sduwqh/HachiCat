@@ -75,10 +75,10 @@ class ToolsConfig(BaseModel):
 
 class ReminderConfig(BaseModel):
     """Reminder frequency configuration (in minutes)."""
-    urgent_interval: int = Field(default=30, ge=10, le=120)     # <1 day DDL
-    soon_interval: int = Field(default=90, ge=30, le=360)       # 1-3 days DDL
-    later_interval: int = Field(default=240, ge=60, le=720)     # 3+ days or no DDL
-    wellness_interval: int = Field(default=60, ge=30, le=240)   # Health nudges
+    urgent_interval: int = Field(default=15, ge=5, le=120)      # <1 day DDL
+    soon_interval: int = Field(default=45, ge=15, le=360)       # 1-3 days DDL
+    later_interval: int = Field(default=120, ge=30, le=720)     # 3+ days or no DDL
+    wellness_interval: int = Field(default=40, ge=15, le=240)   # Health nudges
     enabled: bool = True
 
 

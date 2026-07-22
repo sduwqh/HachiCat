@@ -641,7 +641,7 @@ def main() -> int:
         enabled=rcfg.enabled,
     )
     reminder.reminder_ready.connect(
-        lambda text: pet_window.show_bubble(text, BubbleType.INFO)
+        lambda text: pet_window.show_bubble(text, BubbleType.REMINDER)
     )
     # Also show working animation when reminding
     reminder.reminder_ready.connect(
@@ -808,7 +808,7 @@ def main() -> int:
         pet_window.show_bubble(
             f"<div style='margin:0;padding:0;line-height:1.4;'>"
             f"🌐 {md_to_html(text)}"
-            f"<br><span style='color:#94a3b8;font-size:10px;'>(点击任意位置关闭)</span>"
+            f"<br><span style='color:#b9856f;font-size:10px;'>(点击任意位置关闭)</span>"
             f"</div>",
             BubbleType.TRANSLATION,
         )

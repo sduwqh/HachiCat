@@ -447,7 +447,7 @@ class PetWindow(QWidget):
     # ==================================================================
 
     def show_bubble(self, text: str, bubble_type: BubbleType = BubbleType.INFO) -> None:
-        if bubble_type in (BubbleType.INFO, BubbleType.TRANSLATION):
+        if bubble_type in (BubbleType.INFO, BubbleType.TRANSLATION, BubbleType.REMINDER):
             self._think_timer.stop()
         anchor = QPoint(self.x() + self.width() // 2, self.y())
         self._bubble.show_message(text, bubble_type, anchor)

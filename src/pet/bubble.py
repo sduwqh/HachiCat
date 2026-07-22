@@ -28,12 +28,13 @@ from src.utils.theme import Theme
 
 class BubbleType(Enum):
     """Bubble visual style and behavior."""
-    INFO = auto()        # Blue tint, auto-dismiss
-    WARNING = auto()     # Yellow tint, auto-dismiss
+    INFO = auto()        # Warm tint, auto-dismiss
+    WARNING = auto()     # Amber tint, auto-dismiss
     ERROR = auto()       # Red tint, auto-dismiss
-    ACTION = auto()      # Blue tint, requires button click to dismiss
-    TRANSLATION = auto() # Purple tint, no auto-dismiss, click to close
+    ACTION = auto()      # Warm tint, requires button click to dismiss
+    TRANSLATION = auto() # Warm tint, no auto-dismiss, click to close
     CHAT = auto()        # Pure white, short TTL, pops up close to pet
+    REMINDER = auto()    # Warm coral tint, no auto-dismiss, click to close
 
 
 DURATIONS: dict[BubbleType, int] = {
@@ -43,16 +44,18 @@ DURATIONS: dict[BubbleType, int] = {
     BubbleType.ACTION: 0,        # No auto-dismiss
     BubbleType.TRANSLATION: 0,   # No auto-dismiss, user clicks to close
     BubbleType.CHAT: 800,        # Quick "bark" bubble
+    BubbleType.REMINDER: 0,      # No auto-dismiss — user clicks to close
 }
 
 COLORS: dict[BubbleType, tuple[QColor, QColor]] = {
-    # (background, border)
-    BubbleType.INFO: (QColor(245, 248, 255, 245), QColor(79, 124, 255)),
-    BubbleType.WARNING: (QColor(255, 249, 230, 245), QColor(194, 139, 40)),
-    BubbleType.ERROR: (QColor(255, 240, 240, 245), QColor(194, 102, 102)),
-    BubbleType.ACTION: (QColor(242, 247, 255, 248), QColor(79, 124, 255)),
-    BubbleType.TRANSLATION: (QColor(248, 245, 255, 248), QColor(139, 92, 246)),
-    BubbleType.CHAT: (QColor(255, 255, 255, 250), QColor(200, 200, 200)),
+    # (background, border) — warm coral-pink theme to match the app
+    BubbleType.INFO: (QColor(255, 247, 242, 248), QColor(255, 122, 89)),
+    BubbleType.WARNING: (QColor(255, 249, 230, 248), QColor(194, 139, 40)),
+    BubbleType.ERROR: (QColor(255, 240, 240, 248), QColor(194, 102, 102)),
+    BubbleType.ACTION: (QColor(255, 247, 242, 250), QColor(255, 122, 89)),
+    BubbleType.TRANSLATION: (QColor(255, 247, 242, 248), QColor(255, 122, 89)),
+    BubbleType.CHAT: (QColor(255, 255, 255, 250), QColor(255, 158, 181)),
+    BubbleType.REMINDER: (QColor(255, 245, 238, 250), QColor(255, 122, 89)),
 }
 
 
@@ -183,6 +186,24 @@ class BubbleWidget(QWidget):
             self._label.adjustSize()
             self.setFixedSize(self._label.width() + 38,
                               self._label.height() + 22)
+        elif bubble_type == BubbleType.REMINDER:
+            # Reminder: warm text bubble, no auto-dismiss, click to close.
+            self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+            self._layout.setContentsMargins(16, 12, 16, 12)
+            self._html.hide()
+            self._label.show()
+            self._label.setTextFormat(Qt.RichText)
+            self._label.setFont(QFont("Microsoft YaHei", 11))
+            self._label.setWordWrap(True)
+            self._label.setMaximumWidth(260)
+            self._label.setAlignment(Qt.AlignLeft)
+            self._label.setStyleSheet(
+                f"color: {Theme.text}; background: transparent;")
+            self._label.setText(
+                f"<div style='line-height:1.5;'>🐱 {text}"
+                f"<div style='color:#b9856f; font-size:10px; margin-top:6px;'>"
+                f"点击关闭</div></div>"
+            )
         else:
             self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
             self._layout.setContentsMargins(14, 10, 14, 10)
@@ -295,10 +316,17 @@ class BubbleWidget(QWidget):
 
         bg, border = COLORS.get(self._bubble_type, COLORS[BubbleType.INFO])
 
-        # Background
+        # Background — rounded card matching the app's 16px radius, with a
+        # soft translucent outer halo instead of a hard 1px line.
+        halo = QColor(border)
+        halo.setAlpha(40)
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(halo, 3))
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 16, 16)
+
         painter.setBrush(QBrush(bg))
-        painter.setPen(QPen(border, 1.5))
-        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 14, 14)
+        painter.setPen(QPen(border, 1.4))
+        painter.drawRoundedRect(self.rect().adjusted(2, 2, -2, -2), 15, 15)
 
         # Small tail/triangle pointing downward
         if self._bubble_type != BubbleType.ACTION:
