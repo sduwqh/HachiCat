@@ -36,7 +36,7 @@ class LLMConfig:
     api_key: str = ""                   # Required for cloud APIs
     temperature: float = 0.1
     max_tokens: int = 512
-    timeout_seconds: float = 15.0
+    timeout_seconds: float = 60.0
     enabled: bool = True
 
 

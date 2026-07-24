@@ -112,6 +112,7 @@ class AgentPipeline(QObject):
             import threading
             def _run():
                 import json, logging
+                log = logging.getLogger("hachicat")
                 try:
                     resp = self._classifier._llm_client.force_todo(text)
                     data = json.loads(resp.text)
@@ -131,12 +132,16 @@ class AgentPipeline(QObject):
                             titles.append(item["title"])
                             count += 1
                     if count == 0:
-                        self.task_done.emit(False, "未能识别待办")
+                        if not getattr(resp, "success", True):
+                            self.task_done.emit(False, f"待办识别失败: {getattr(resp, 'error', '') or ''}")
+                        else:
+                            self.task_done.emit(False, "未能识别待办")
                     elif count == 1:
                         self.task_done.emit(True, f"已添加待办 ✓\n📌 {titles[0]}")
                     else:
                         self.task_done.emit(True, f"已添加{count}条待办 ✓\n📌 {titles[0]} 等")
-                except Exception:
+                except Exception as e:
+                    log.warning("[todo] parse/exec failed: %s", e)
                     self.task_done.emit(False, "未能识别待办")
             threading.Thread(target=_run, daemon=True).start()
             return
@@ -174,6 +179,8 @@ class AgentPipeline(QObject):
 {text}"""
         import threading
         def _run():
+            import logging
+            log = logging.getLogger("hachicat")
             try:
                 resp = self._classifier._llm_client.chat(
                     [{"role": "user", "content": prompt}],
@@ -182,8 +189,10 @@ class AgentPipeline(QObject):
                 if resp.success and resp.text:
                     self.translation_ready.emit(resp.text.strip())
                 else:
-                    self.task_done.emit(False, "翻译失败")
+                    log.warning("[translate] failed: %s", getattr(resp, "error", None))
+                    self.task_done.emit(False, f"翻译失败: {getattr(resp, 'error', '') or ''}")
             except Exception as e:
+                log.warning("[translate] exception: %s", e)
                 self.task_done.emit(False, f"翻译失败: {e}")
         threading.Thread(target=_run, daemon=True).start()
 
@@ -534,7 +543,7 @@ def main() -> int:
             provider=s.llm.provider, model=s.llm.model,
             api_base=s.llm.api_base, api_key=s.llm.api_key,
             temperature=s.llm.temperature, max_tokens=s.llm.max_tokens,
-            timeout_seconds=15.0, enabled=s.llm.enabled,
+            timeout_seconds=60.0, enabled=s.llm.enabled,
         ))
         if llm_client:
             llm_client.close()
@@ -579,7 +588,7 @@ def main() -> int:
         api_key=config.settings.llm.api_key,
         temperature=config.settings.llm.temperature,
         max_tokens=config.settings.llm.max_tokens,
-        timeout_seconds=15.0,
+        timeout_seconds=60.0,
         enabled=config.settings.llm.enabled,
     )
     llm_client = create_llm_client(llm_config)
